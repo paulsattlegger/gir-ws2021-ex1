@@ -79,17 +79,27 @@ def get_articles(path: str) -> Generator[Article, None, None]:
                     yield Article(parser.title, parser.bdy)
 
 
+def get_terms(article: Article) -> Generator[str, None, None]:
+    for term in article.bdy.split(' '):
+        yield term.strip()
+
+
+def index_article(index: InvertedIndex, article: Article):
+    words = get_terms(article)
+    for term, count in Counter(words).items():
+        index.add(term, Posting(article.title, count))
+
+
 def main():
+    index = InvertedIndex()
     articles = get_articles('../dataset/wikipedia articles')
-    for article in islice(articles, 1):
-        print(article)
+
+    for article in islice(articles, 1000):
+        index_article(index, article)
+
+    print(index.data['Football'])
 
     # TODO: aim creation time ~ 30 minutes
-    index = InvertedIndex()
-    index.add("Brutus", Posting("2", 1))
-    index.add("Caesar", Posting("1", 1))
-    index.add("Caesar", Posting("2", 1))
-
     # TODO: save and load inverted index (pickle)
 
 
