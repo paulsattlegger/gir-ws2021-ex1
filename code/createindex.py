@@ -2,50 +2,54 @@
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
 from time import perf_counter
-from collections import namedtuple, Counter
+from collections import namedtuple
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
 from typing import Generator
 
-Posting = namedtuple("Posting", ["document_id", "frequency"])
-Article = namedtuple("Article", ["title", "bdy"])
+Article = namedtuple("Article", ["title", "title_id", "bdy"])
 
 
 class ArticleParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.title = None
-        self.bdy = None
-        self.end_of_article = False
-        self._current_tag = None
-        self._data = ''
+        self.title: str | None = None
+        self.title_id: int | None = None
+        self.bdy: str | None = None
+        self.end_of_article: bool = False
+        self._previous_tag, self._current_tag = None, None
+        self._previous_data, self._current_data = None, None
 
     def handle_starttag(self, tag, attrs):
-        self._current_tag = tag
-        self._data = ''
+        self._previous_tag, self._current_tag = self._current_tag, tag
+        self._previous_data, self._current_data = self._current_data, ''
         self.end_of_article = False
 
     def handle_endtag(self, tag):
         match tag:
             case 'title':
-                self.title = self._data
+                self.title = self._current_data
             case 'bdy':
-                self.bdy = self._data
+                self.bdy = self._current_data
+            case 'id':
+                match self._previous_tag:
+                    case 'title':
+                        self.title_id = int(self._current_data)
             case 'article':
                 self.end_of_article = True
 
     def handle_data(self, data):
         match self._current_tag:
-            case 'title' | 'bdy':
-                self._data += data
+            case 'title' | 'bdy' | 'id':
+                self._current_data += data
 
 
 class InvertedIndex:
     def __init__(self):
-        self.data: dict[str, list[Posting]] = {}
+        self.data: dict[str, list[int]] = {}
 
-    def add(self, term: str, posting: Posting):
+    def add(self, term: str, posting: int):
         if term in self.data:
             self.data[term].append(posting)
         else:
@@ -77,7 +81,7 @@ def get_articles(path: str) -> Generator[Article, None, None]:
             for line in fh:
                 parser.feed(line)
                 if parser.end_of_article:
-                    yield Article(parser.title, parser.bdy)
+                    yield Article(parser.title, parser.title_id, parser.bdy)
 
 
 def get_terms(article: Article) -> Generator[str, None, None]:
@@ -86,9 +90,8 @@ def get_terms(article: Article) -> Generator[str, None, None]:
 
 
 def index_article(index: InvertedIndex, article: Article):
-    words = get_terms(article)
-    for term, count in Counter(words).items():
-        index.add(term, Posting(article.title, count))
+    for term in get_terms(article):
+        index.add(term, article.title_id)
 
 
 def main():
