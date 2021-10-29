@@ -59,19 +59,18 @@ def remove_apostrophes(token):
 
 
 def remove_hyphen(token):
-    """# remove hyphen only for words but not for numbers
+    # remove hyphen only for words but not for numbers
     # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
-    for word in re.split('(?<!\d)[-|–|—|―](?!\d)', token):
-        yield word"""
     for word in re.split('(?<=\d)[-|–|—|―](?<=\d)', token):
         yield word
 
+
 def remove_punctation(token):
-    #return re.split('\.|,|;', token)[0]
+    # return re.split('\.|,|;', token)[0]
     # remove punctation only from words not for numbers
     # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
     token = re.sub(r'(?<!\d)[^\w\s](?!\d)', '', token)
-    return token.strip(string.punctuation) # to cover (1856–1953)
+    return token.strip(string.punctuation)  # to cover (1856–1953)
 
 
 def stem(term):
