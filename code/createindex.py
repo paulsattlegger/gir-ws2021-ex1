@@ -133,26 +133,31 @@ def stem(term):
     return stemmer.stem(term)
 
 
+def get_documents(path: str) -> Generator[str, None, None]:
+    for file in Path(path).iterdir():
+        yield file
+
+
 def get_articles(path: str) -> Generator[Article, None, None]:
     parser = ArticleParser()
-    for file_path in Path(path).iterdir():
-        with open(file_path, encoding='utf-8') as file:
-            for line in file:
-                parser.feed(line)
-                if parser.end_of_article:
-                    yield Article(parser.title, parser.title_id, parser.bdy)
+    with open(path, encoding='utf-8') as file:
+        for line in file:
+            parser.feed(line)
+            if parser.end_of_article:
+                yield Article(parser.title, parser.title_id, parser.bdy)
 
 
 def main():
     index = InvertedIndex()
-    articles = get_articles('../dataset/wikipedia articles')
 
     # Benchmark
     start = perf_counter()
     n = 283
-    for article in islice(articles, n):
-        for token in text2tokens(article.bdy):
-            index.insert(token, article.title_id)
+    for document in get_documents('../dataset/wikipedia articles'):
+        # TODO: remove islice in final version
+        for article in islice(get_articles(document), n):
+            for token in text2tokens(article.bdy):
+                index.insert(token, article.title_id)
     articles_total = 283438
     articles_per_second = n / (perf_counter() - start)
     print(f'{articles_per_second} articles/s')
