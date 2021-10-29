@@ -1,6 +1,7 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
+from time import perf_counter
 from collections import namedtuple, Counter
 from html.parser import HTMLParser
 from itertools import islice
@@ -94,10 +95,15 @@ def main():
     index = InvertedIndex()
     articles = get_articles('../dataset/wikipedia articles')
 
-    for article in islice(articles, 1000):
+    # Benchmark
+    start = perf_counter()
+    n = 10000
+    for article in islice(articles, n):
         index_article(index, article)
-
-    print(index.data['Football'])
+    articles_total = 283438
+    articles_per_second = n / (perf_counter() - start)
+    print(f'{articles_per_second} articles/s')
+    print(f'{articles_total / articles_per_second / 60} m total')
 
     # TODO: aim creation time ~ 30 minutes
     # TODO: save and load inverted index (pickle)
