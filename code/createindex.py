@@ -1,11 +1,43 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
-from collections import namedtuple
-
-# TODO: from html.parser import HTMLParser
+from collections import namedtuple, Counter
+from html.parser import HTMLParser
+from itertools import islice
+from pathlib import Path
+from typing import Generator
 
 Posting = namedtuple("Posting", ["document_id", "frequency"])
+Article = namedtuple("Article", ["title", "bdy"])
+
+
+class ArticleParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.title = None
+        self.bdy = None
+        self.end_of_article = False
+        self._current_tag = None
+        self._data = ''
+
+    def handle_starttag(self, tag, attrs):
+        self._current_tag = tag
+        self._data = ''
+        self.end_of_article = False
+
+    def handle_endtag(self, tag):
+        match tag:
+            case 'title':
+                self.title = self._data
+            case 'bdy':
+                self.bdy = self._data
+            case 'article':
+                self.end_of_article = True
+
+    def handle_data(self, data):
+        match self._current_tag:
+            case 'title' | 'bdy':
+                self._data += data
 
 
 class InvertedIndex:
@@ -36,15 +68,28 @@ def text2tokens(text):
     pass
 
 
+def get_articles(path: str) -> Generator[Article, None, None]:
+    parser = ArticleParser()
+    path = Path(path)
+    for file in path.iterdir():
+        with open(file, encoding='utf-8') as fh:
+            for line in fh:
+                parser.feed(line)
+                if parser.end_of_article:
+                    yield Article(parser.title, parser.bdy)
+
+
 def main():
+    articles = get_articles('../dataset/wikipedia articles')
+    for article in islice(articles, 1):
+        print(article)
+
     # TODO: aim creation time ~ 30 minutes
     index = InvertedIndex()
     index.add("Brutus", Posting("2", 1))
     index.add("Caesar", Posting("1", 1))
     index.add("Caesar", Posting("2", 1))
-    print(index)
 
-    # TODO: parse HTML/XML files
     # TODO: save and load inverted index (pickle)
 
 
