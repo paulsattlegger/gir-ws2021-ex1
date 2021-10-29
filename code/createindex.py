@@ -1,25 +1,71 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
+import pickle
 from collections import namedtuple
 from nltk.stem import *
 import re
 import string
+from html.parser import HTMLParser
+from itertools import islice
+from pathlib import Path
+from time import perf_counter
+from typing import Generator
 
-# TODO: from html.parser import HTMLParser
+Article = namedtuple("Article", ["title", "title_id", "bdy"])
 
-Posting = namedtuple("Posting", ["document_id", "frequency"])
+
+class ArticleParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.title: str | None = None
+        self.title_id: int | None = None
+        self.bdy: str | None = None
+        self.end_of_article: bool = False
+        self._previous_tag, self._current_tag = None, None
+        self._previous_data, self._current_data = None, None
+
+    def handle_starttag(self, tag, attrs):
+        self._previous_tag, self._current_tag = self._current_tag, tag
+        self._previous_data, self._current_data = self._current_data, ''
+        self.end_of_article = False
+
+    def handle_endtag(self, tag):
+        match tag:
+            case 'title':
+                self.title = self._current_data
+            case 'bdy':
+                self.bdy = self._current_data
+            case 'id':
+                match self._previous_tag:
+                    case 'title':
+                        self.title_id = int(self._current_data)
+            case 'article':
+                self.end_of_article = True
+
+    def handle_data(self, data):
+        match self._current_tag:
+            case 'title' | 'bdy' | 'id':
+                self._current_data += data
 
 
 class InvertedIndex:
     def __init__(self):
-        self.data: dict[str, list[Posting]] = {}
+        self.data: dict[str, list[int]] = {}
 
-    def add(self, term: str, posting: Posting):
+    def add(self, term: str, posting: int):
         if term in self.data:
             self.data[term].append(posting)
         else:
             self.data[term] = [posting]
+
+    def dump(self):
+        with open('../index.obj', 'wb') as file:
+            pickle.dump(self.data, file)
+
+    def load(self):
+        with open('../index.obj', 'rb') as file:
+            self.data = pickle.load(file)
 
     def __str__(self):
         return str(self.data)
@@ -82,7 +128,41 @@ def stem(term):
     return PorterStemmer().stem(term)
 
 
+def get_articles(path: str) -> Generator[Article, None, None]:
+    parser = ArticleParser()
+    for file_path in Path(path).iterdir():
+        with open(file_path, encoding='utf-8') as file:
+            for line in file:
+                parser.feed(line)
+                if parser.end_of_article:
+                    yield Article(parser.title, parser.title_id, parser.bdy)
+
+
+def get_terms(article: Article) -> Generator[str, None, None]:
+    for term in article.bdy.split(' '):
+        yield term.strip()
+
+
+def index_article(index: InvertedIndex, article: Article):
+    for term in get_terms(article):
+        index.add(term, article.title_id)
+
+
 def main():
+    index = InvertedIndex()
+    articles = get_articles('../dataset/wikipedia articles')
+
+    # Benchmark
+    start = perf_counter()
+    n = 28343
+    for article in islice(articles, n):
+        index_article(index, article)
+    articles_total = 283438
+    articles_per_second = n / (perf_counter() - start)
+    print(f'{articles_per_second} articles/s')
+    print(f'{articles_total / articles_per_second / 60} m total')
+    index.dump()
+
     # TODO: aim creation time ~ 30 minutes
     index = InvertedIndex()
     index.add("Brutus", Posting("2", 1))
