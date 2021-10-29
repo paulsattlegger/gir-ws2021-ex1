@@ -1,11 +1,12 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
-from time import perf_counter
+import pickle
 from collections import namedtuple
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
+from time import perf_counter
 from typing import Generator
 
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
@@ -55,6 +56,14 @@ class InvertedIndex:
         else:
             self.data[term] = [posting]
 
+    def dump(self):
+        with open('../index.obj', 'wb') as file:
+            pickle.dump(self.data, file)
+
+    def load(self):
+        with open('../index.obj', 'rb') as file:
+            self.data = pickle.load(file)
+
     def __str__(self):
         return str(self.data)
 
@@ -75,10 +84,9 @@ def text2tokens(text):
 
 def get_articles(path: str) -> Generator[Article, None, None]:
     parser = ArticleParser()
-    path = Path(path)
-    for file in path.iterdir():
-        with open(file, encoding='utf-8') as fh:
-            for line in fh:
+    for file_path in Path(path).iterdir():
+        with open(file_path, encoding='utf-8') as file:
+            for line in file:
                 parser.feed(line)
                 if parser.end_of_article:
                     yield Article(parser.title, parser.title_id, parser.bdy)
@@ -100,13 +108,14 @@ def main():
 
     # Benchmark
     start = perf_counter()
-    n = 10000
+    n = 28343
     for article in islice(articles, n):
         index_article(index, article)
     articles_total = 283438
     articles_per_second = n / (perf_counter() - start)
     print(f'{articles_per_second} articles/s')
     print(f'{articles_total / articles_per_second / 60} m total')
+    index.dump()
 
     # TODO: aim creation time ~ 30 minutes
     # TODO: save and load inverted index (pickle)
