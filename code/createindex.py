@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
 from time import perf_counter
-from typing import Generator
+from typing import Generator, Dict, List, Optional
 
 from nltk.stem import *
 
@@ -24,9 +24,9 @@ stemmer = PorterStemmer()
 class ArticleParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.title: str | None = None
-        self.title_id: int | None = None
-        self.bdy: str | None = None
+        self.title: Optional[str] = None
+        self.title_id: Optional[int] = None
+        self.bdy: Optional[str] = None
         self.end_of_article: bool = False
         self._previous_tag, self._current_tag = None, None
         self._previous_data, self._current_data = None, None
@@ -37,27 +37,23 @@ class ArticleParser(HTMLParser):
         self.end_of_article = False
 
     def handle_endtag(self, tag):
-        match tag:
-            case 'title':
-                self.title = self._current_data
-            case 'bdy':
-                self.bdy = self._current_data
-            case 'id':
-                match self._previous_tag:
-                    case 'title':
-                        self.title_id = int(self._current_data)
-            case 'article':
-                self.end_of_article = True
+        if tag == 'title':
+            self.title = self._current_data
+        elif tag == 'bdy':
+            self.bdy = self._current_data
+        elif tag == 'id' and self._previous_tag == 'title':
+            self.title_id = int(self._current_data)
+        elif tag == 'article':
+            self.end_of_article = True
 
     def handle_data(self, data):
-        match self._current_tag:
-            case 'title' | 'bdy' | 'id':
-                self._current_data += data
+        if self._current_tag in ['title', 'bdy', 'id']:
+            self._current_data += data
 
 
 class InvertedIndex:
     def __init__(self):
-        self.data: dict[str, list[int]] = {}
+        self.data: Dict[str, List[int]] = {}
 
     def insert(self, term: str, posting: int):
         if term in self.data:
@@ -171,15 +167,15 @@ def main():
     print(' '.join(singles))"""
 
     test_inputtext = "Apostrophes: nation's Australia's other's another`s different´s apostrophes" \
-                    "Hyphens: simple-hyphen ndash–hyphen mdash—hyphen horbar―hyphen ISBN 0-679-73392-2  1805–1872 (1856–1953) " \
-                    "Infobox Football biography Defender/Sweeper Cabezón'' San Lorenzo de Almagro Chivas UAG Tecos" \
-                    " Independiente Elche CF Club América San Lorenzo de Almagro 097 0(7) gold medal s in the nation's " \
-                    "best in the nation's Australia's other's another`s different´s apostrophes rifled musket s," \
-                    "rifled musket s, repeating rifles , and fortified entrenchment s contributed to the death of many" \
-                    " men. General s and other officers , many professionally trained in tactics from the Napoleonic " \
-                    "Wars , were often slow to develop changes in tactics in response. Outbreak of war companies " \
-                    " ((each with roughly 100 men and led by a captain , with associated lieutenant s). Field" \
-                    " officers normally included a colonel  (commanding), most frequent corps per army 1  4  2.74 2  divisions per (((.corps)  ( Rifle &amp; Light pages 180-81"
+                     "Hyphens: simple-hyphen ndash–hyphen mdash—hyphen horbar―hyphen ISBN 0-679-73392-2  1805–1872 (1856–1953) " \
+                     "Infobox Football biography Defender/Sweeper Cabezón'' San Lorenzo de Almagro Chivas UAG Tecos" \
+                     " Independiente Elche CF Club América San Lorenzo de Almagro 097 0(7) gold medal s in the nation's " \
+                     "best in the nation's Australia's other's another`s different´s apostrophes rifled musket s," \
+                     "rifled musket s, repeating rifles , and fortified entrenchment s contributed to the death of many" \
+                     " men. General s and other officers , many professionally trained in tactics from the Napoleonic " \
+                     "Wars , were often slow to develop changes in tactics in response. Outbreak of war companies " \
+                     " ((each with roughly 100 men and led by a captain , with associated lieutenant s). Field" \
+                     " officers normally included a colonel  (commanding), most frequent corps per army 1  4  2.74 2  divisions per (((.corps)  ( Rifle &amp; Light pages 180-81"
 
     for token in text2tokens(test_inputtext):
         print(token)
