@@ -22,30 +22,29 @@ Article = namedtuple("Article", ["title", "title_id", "bdy"])
 stemmer = PorterStemmer()
 
 
-class ArticleParser(HTMLParser):
+class ArticlesParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.title: Optional[str] = None
-        self.title_id: Optional[int] = None
-        self.bdy: Optional[str] = None
-        self.end_of_article: bool = False
+        self.articles: list[Article] = []
+        self._title: Optional[str] = None
+        self._title_id: Optional[int] = None
+        self._bdy: Optional[str] = None
         self._previous_tag, self._current_tag = None, None
         self._previous_data, self._current_data = None, None
 
     def handle_starttag(self, tag, attrs):
         self._previous_tag, self._current_tag = self._current_tag, tag
         self._previous_data, self._current_data = self._current_data, ''
-        self.end_of_article = False
 
     def handle_endtag(self, tag):
         if tag == 'title':
-            self.title = self._current_data
+            self._title = self._current_data
         elif tag == 'bdy':
-            self.bdy = self._current_data
+            self._bdy = self._current_data
         elif tag == 'id' and self._previous_tag == 'title':
-            self.title_id = int(self._current_data)
+            self._title_id = int(self._current_data)
         elif tag == 'article':
-            self.end_of_article = True
+            self.articles.append(Article(self._title, self._title_id, self._bdy))
 
     def handle_data(self, data):
         if self._current_tag in ['title', 'bdy', 'id']:
@@ -135,13 +134,13 @@ def stem(term):
 
 
 def get_articles(document_paths: Iterable[Path]) -> Generator[Article, None, None]:
-    parser = ArticleParser()
+    parser = ArticlesParser()
     for document_path in document_paths:
         with open(document_path, encoding='utf-8') as file:
             for line in file:
                 parser.feed(line)
-                if parser.end_of_article:
-                    yield Article(parser.title, parser.title_id, parser.bdy)
+            yield from parser.articles
+            parser.articles.clear()
 
 
 @contextmanager
@@ -160,7 +159,7 @@ def main():
     index = InvertedIndex()
     document_paths = Path('../dataset/wikipedia articles').iterdir()
 
-    articles_total = 200  # total=283438
+    articles_total = 200  # $ cat * | grep "<article" | wc -l == 281782
     with benchmark(articles_total):
         for article in islice(get_articles(document_paths), articles_total):
             for token in text2tokens(article.bdy):
