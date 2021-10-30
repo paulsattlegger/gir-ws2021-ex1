@@ -1,15 +1,16 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
-import pickle
+import json
 import re
 import string
 from collections import namedtuple
+from contextlib import contextmanager
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, List, Optional
+from typing import Generator, Dict, List, Optional, Iterable
 
 from nltk.stem import *
 
@@ -65,12 +66,12 @@ class InvertedIndex:
         return self.data.get(term)
 
     def dump(self):
-        with open('../index.obj', 'wb') as file:
-            pickle.dump(self.data, file)
+        with open('../index.json', 'w') as file:
+            json.dump(self.data, file)
 
     def load(self):
-        with open('../index.obj', 'rb') as file:
-            self.data = pickle.load(file)
+        with open('../index.json') as file:
+            self.data = json.load(file)
 
     def __str__(self):
         return str(self.data)
@@ -133,36 +134,38 @@ def stem(term):
     return stemmer.stem(term)
 
 
-def get_documents(path: str) -> Generator[str, None, None]:
-    for file in Path(path).iterdir():
-        yield file
-
-
-def get_articles(path: str) -> Generator[Article, None, None]:
+def get_articles(document_paths: Iterable[Path]) -> Generator[Article, None, None]:
     parser = ArticleParser()
-    with open(path, encoding='utf-8') as file:
-        for line in file:
-            parser.feed(line)
-            if parser.end_of_article:
-                yield Article(parser.title, parser.title_id, parser.bdy)
+    for document_path in document_paths:
+        with open(document_path, encoding='utf-8') as file:
+            for line in file:
+                parser.feed(line)
+                if parser.end_of_article:
+                    yield Article(parser.title, parser.title_id, parser.bdy)
+
+
+@contextmanager
+def benchmark(articles_total: int):
+    start = perf_counter()
+    try:
+        yield
+    finally:
+        end = perf_counter()
+        articles_per_second = articles_total / (end - start)
+        print(f'{articles_per_second:.2f} articles/second')
+        print(f'{articles_total / articles_per_second / 60:.2f} m total indexing time')
 
 
 def main():
     index = InvertedIndex()
+    document_paths = Path('../dataset/wikipedia articles').iterdir()
 
-    # Benchmark
-    start = perf_counter()
-    n = 283
-    for document in get_documents('../dataset/wikipedia articles'):
-        # TODO: remove islice in final version
-        for article in islice(get_articles(document), n):
+    articles_total = 200  # total=283438
+    with benchmark(articles_total):
+        for article in islice(get_articles(document_paths), articles_total):
             for token in text2tokens(article.bdy):
                 index.insert(token, article.title_id)
-    articles_total = 283438
-    articles_per_second = n / (perf_counter() - start)
-    print(f'{articles_per_second} articles/s')
-    print(f'{articles_total / articles_per_second / 60} m total')
-    print(index.search('art'))
+
     index.dump()
 
     """plurals = ['caresses', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned', 'humbled', 'sized', 'meeting',
@@ -189,9 +192,6 @@ def main():
     print("---- apostophes test ----")
     apostrophes_test = "in the nation's Australia's other's another`s different´s apostrophes"
     print(remove_apostrophes(apostrophes_test))
-
-    # TODO: parse HTML/XML files
-    # TODO: save and load inverted index (pickle)
 
 
 if __name__ == "__main__":
