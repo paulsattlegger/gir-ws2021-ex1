@@ -57,7 +57,7 @@ class ArticlesParser(HTMLParser):
         elif tag == 'bdy':
             self._bdy = ''.join(self._current_data)
         elif tag == 'id' and self._previous_tag == 'title':
-            self._title_id = ''.join(self._current_data)
+            self._title_id = int(''.join(self._current_data))
         elif tag == 'article':
             self.articles.append(Article(self._title, self._title_id, self._bdy))
 
