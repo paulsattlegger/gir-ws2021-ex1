@@ -96,7 +96,9 @@ class InvertedIndex:
                 print(f'\rIndexing: {self.article_count}/{articles_total} ({articles_per_second:.2f} articles/s)',
                       f'[Estimated remaining time: {timedelta(seconds=seconds_remaining)}]', end='')
                 # __benchmark__ }
-            print()
+        # __benchmark__ {
+        print(f'\nTotal indexing time: {timedelta(seconds=perf_counter() - start)}', end='')
+        # __benchmark__ }
         self._optimise()
 
     def _optimise(self):
@@ -106,7 +108,7 @@ class InvertedIndex:
         for token in self.tokens:
             self.tokens[token] = np.array(self.tokens[token])
         # __benchmark__ {
-        print(f'Optimise tokens index: {timedelta(seconds=perf_counter() - start)}')
+        print(f'\nTotal index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
 
     def fetch(self, article_title_id: int) -> Optional[Article]:
