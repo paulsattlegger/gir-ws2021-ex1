@@ -5,6 +5,8 @@ import pickle
 import re
 import string
 import unittest
+# import nltk for downloading the list of stopwords
+import nltk
 from collections import namedtuple
 from datetime import timedelta
 from html.parser import HTMLParser
@@ -13,7 +15,8 @@ from time import perf_counter
 from typing import Generator, Dict, Optional, Union
 
 import numpy as np
-from nltk.stem import *
+from nltk.stem import *  # Allowed stemming library
+from nltk.corpus import stopwords  # Allowed stopwords list
 
 APOSTROPHES_REGEX = r'[\u0022\u0027\u0060\u00AB\u00B4\u00BB\u2018\u2019\u201B\u201C\u201D\u201E\u201F\u2039\u203A' \
                     r'\u275B\u275C\u275D\u275E\u275F\u276E\u276F]'  # Unicode apostrophes
@@ -27,6 +30,9 @@ Article = namedtuple("Article", ["title", "title_id", "bdy"])
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
 
 stemmer_cache = {}
+
+nltk.download('stopwords')
+stop_words = stopwords.words('english')
 
 
 # TODO maybe ignore stopwords to improve performance
@@ -148,8 +154,10 @@ def text2tokens(text):
     tokens = tokenize(text)
     tokens = lowercase(tokens)
     tokens = stem(tokens)
+    tokens = remove_stop_words(tokens)
 
     return list(tokens)
+
 
 def tokenize(text):
     """
@@ -183,6 +191,7 @@ def remove_hyphen(tokens):
         for portion in re.split(HYPHEN_REGEX, token):
             yield portion
 
+
 def remove_punctuation(tokens):
     # remove punctuation only from words not for numbers
     # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
@@ -192,9 +201,11 @@ def remove_punctuation(tokens):
         if token:  # matches empty string ''
             yield token
 
+
 def lowercase(tokens):
     for token in tokens:
         yield token.lower()
+
 
 def stem(tokens):
     """
@@ -209,6 +220,12 @@ def stem(tokens):
             stemmed_token = stemmer.stem(token)
             stemmer_cache[token] = stemmed_token
             yield stemmed_token
+
+
+def remove_stop_words(tokens):
+    for token in tokens:
+        if token not in stop_words:
+            yield token
 
 
 def get_articles(document: Path) -> Generator[Article, None, None]:
@@ -248,11 +265,17 @@ class TestTextPreProcessing(unittest.TestCase):
                          'meet', 'state', 'siez', 'item', 'sensat', 'tradit', 'refer', 'colon', 'plot']
         self.assertEqual(list(stem(input_text)), expected_text)
 
+    def test_remove_stop_words(self):
+        input_text = ['i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope', "you're", "you've", 'stillhere']
+        expected_text = ['notremoved', 'stays', 'nope', 'stillhere']
+        self.assertEqual(list(remove_stop_words(input_text)), expected_text)
+
 
 def main():
     index = InvertedIndex()
     index.populate(Path('../dataset/wikipedia articles'), articles_total=200)
     index.dump()
+
 
 if __name__ == "__main__":
     main()
