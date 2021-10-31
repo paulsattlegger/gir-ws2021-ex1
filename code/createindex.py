@@ -5,11 +5,12 @@ import pickle
 import re
 import string
 from collections import namedtuple
+from datetime import timedelta
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, List, Optional
+from typing import Generator, Dict, Optional, Union
 
 import numpy as np
 from nltk.stem import *
@@ -52,49 +53,72 @@ class ArticlesParser(HTMLParser):
 
 
 class InvertedIndex:
-    def __init__(self, base_dir: str):
-        self.data: Dict[str, List[np.array]] = {}
-        self.article_count = 0
-        self._base_dir = base_dir
+    dump_file = Path('../index.obj')
 
-    def insert(self, term: str, posting: np.array):
-        if term in self.data:
-            self.data[term].append(posting)
-        else:
-            self.data[term] = [posting]
+    def __init__(self):
+        self.tokens: Dict[str, Union[list, np.array]] = {}
+        self.articles: Dict[int, Path] = {}
 
-    def index(self):
-        documents = Path(self._base_dir).iterdir()
+    def populate(self, path: Path, articles_total: int = 281782):
+        documents = path.iterdir()
         # TODO: remove from final version
         documents = islice(documents, 5)
+        # __benchmark__ {
+        articles_processed = 0
+        start = perf_counter()
+        # __benchmark__ }
         for document in documents:
             for article in get_articles(document):
-                self.article_count += 1
                 for token in text2tokens(article.bdy):
-                    posting = np.array([document.stem, article.title_id], dtype=np.uint32)
-                    self.insert(token, posting)
+                    if token in self.tokens:
+                        self.tokens[token].append(article.title_id)
+                    else:
+                        self.tokens[token] = [article.title_id]
+                self.articles[article.title_id] = document
+                # __benchmark__ {
+                articles_processed += 1
+                # TODO: 5 documents equivalent to 2276 articles, all equivalent to articles_total
+                articles_per_second = articles_processed / (perf_counter() - start)
+                print(f'Indexing: {articles_processed}/2276 ({articles_per_second:.2f} articles/s)', end='\r')
+        print()
+        # __benchmark__ }
+        # __benchmark__ {
+        articles_per_second = articles_processed / (perf_counter() - start)
+        print(f'Estimated total indexing time: {timedelta(seconds=articles_total / articles_per_second)}')
+        # __benchmark__ }
+        self._optimise()
 
-    def fetch(self, posting: np.array) -> Optional[Article]:
-        document_id, article_title_id = posting
-        document = Path(self._base_dir, f'{document_id}.xml')
+    def _optimise(self):
+        # __benchmark__ {
+        start = perf_counter()
+        # __benchmark__ }
+        for token in self.tokens:
+            self.tokens[token] = np.array(self.tokens[token])
+        # __benchmark__ {
+        print(f'Optimise tokens index: {timedelta(seconds=perf_counter() - start)}')
+        # __benchmark__ }
+
+    def fetch(self, article_title_id: int) -> Optional[Article]:
+        document = self.articles[article_title_id]
         for article in get_articles(document):
             if article.title_id == article_title_id:
                 return article
 
-    def search(self, term: str) -> Optional[list[np.array]]:
-        return self.data.get(term)
+    def search(self, term: str) -> Optional[Union[list, np.array]]:
+        return self.tokens.get(term)
 
     def dump(self):
-        with open('../index.obj', 'wb') as file:
+        with InvertedIndex.dump_file.open('wb') as file:
             pickle.dump(self, file)
+        print(f'{InvertedIndex.dump_file.stat().st_size:} bytes written')
 
     @staticmethod
     def load() -> 'InvertedIndex':
-        with open('../index.obj', 'rb') as file:
+        with InvertedIndex.dump_file.open('rb') as file:
             return pickle.load(file)
 
     def __str__(self):
-        return str(self.data)
+        return str(self.tokens)
 
 
 def text2tokens(text):
@@ -156,26 +180,16 @@ def stem(term):
 
 def get_articles(document: Path) -> Generator[Article, None, None]:
     parser = ArticlesParser()
-    with open(document, encoding='utf-8') as file:
+    with document.open(encoding='utf-8') as file:
         for line in file:
             parser.feed(line)
         yield from parser.articles
         parser.articles.clear()
 
 
-def get_stats(articles_processed: int, start: float, articles_total: int = 281782):
-    # $ cat * | grep "<article" | wc -l == 281782
-    end = perf_counter()
-    articles_per_second = articles_processed / (end - start)
-    print(f'Performance: {articles_per_second:.2f} articles/s')
-    print(f'Estimated total indexing time: {articles_total / articles_per_second / 60:.2f} m')
-
-
 def main():
-    index = InvertedIndex('../dataset/wikipedia articles')
-    start = perf_counter()
-    index.index()
-    get_stats(index.article_count, start)
+    index = InvertedIndex()
+    index.populate(Path('../dataset/wikipedia articles'))
     index.dump()
     return
 
