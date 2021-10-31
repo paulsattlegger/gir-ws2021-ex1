@@ -68,8 +68,6 @@ class InvertedIndex:
 
     def populate(self, path: Path, articles_total: int = 281782):
         documents = path.iterdir()
-        # TODO: remove from final version
-        documents = islice(documents, 1)
         # __benchmark__ {
         articles_processed = 0
         start = perf_counter()
@@ -150,11 +148,6 @@ def text2tokens(text):
     tokens = stem(tokens)
 
     return list(tokens)
-
-    """for token in tokenize(text):
-        token = token.lower()
-        yield stem(token)"""
-
 
 def tokenize(text):
     """
