@@ -7,7 +7,6 @@ import string
 from collections import namedtuple
 from datetime import timedelta
 from html.parser import HTMLParser
-from itertools import islice
 from pathlib import Path
 from time import perf_counter
 from typing import Generator, Dict, Optional, Union
@@ -61,8 +60,6 @@ class InvertedIndex:
 
     def populate(self, path: Path, articles_total: int = 281782):
         documents = path.iterdir()
-        # TODO: remove from final version
-        documents = islice(documents, 5)
         # __benchmark__ {
         articles_processed = 0
         start = perf_counter()
@@ -75,16 +72,21 @@ class InvertedIndex:
                     else:
                         self.tokens[token] = [article.title_id]
                 self.articles[article.title_id] = document
+                if articles_processed == articles_total:
+                    break
                 # __benchmark__ {
                 articles_processed += 1
-                # TODO: 5 documents equivalent to 2276 articles, all equivalent to articles_total
                 articles_per_second = articles_processed / (perf_counter() - start)
-                print(f'Indexing: {articles_processed}/2276 ({articles_per_second:.2f} articles/s)', end='\r')
-        print()
-        # __benchmark__ }
+                seconds_remaining = (articles_total - articles_processed) / articles_per_second
+                print(f'\rIndexing: {articles_processed}/{articles_total} ({articles_per_second:.2f} articles/s)',
+                      f'[Estimated remaining time: {timedelta(seconds=seconds_remaining)}]', end='')
+                # __benchmark__ }
+            if articles_processed == articles_total:
+                break
         # __benchmark__ {
+        print()
         articles_per_second = articles_processed / (perf_counter() - start)
-        print(f'Estimated total indexing time: {timedelta(seconds=articles_total / articles_per_second)}')
+        print(f'Estimated total indexing time: {timedelta(seconds=281782 / articles_per_second)}')
         # __benchmark__ }
         self._optimise()
 
@@ -110,7 +112,7 @@ class InvertedIndex:
     def dump(self):
         with InvertedIndex.dump_file.open('wb') as file:
             pickle.dump(self, file)
-        print(f'{InvertedIndex.dump_file.stat().st_size:} bytes written')
+        print(f'Bytes written: {InvertedIndex.dump_file.stat().st_size:}')
 
     @staticmethod
     def load() -> 'InvertedIndex':
@@ -189,7 +191,7 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
 
 def main():
     index = InvertedIndex()
-    index.populate(Path('../dataset/wikipedia articles'))
+    index.populate(Path('../dataset/wikipedia articles'), articles_total=2276)
     index.dump()
     return
 
