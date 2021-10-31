@@ -5,11 +5,13 @@ import pickle
 import re
 import string
 from collections import namedtuple
+from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from html.parser import HTMLParser
+from os import PathLike
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, Optional, Union
+from typing import Generator, Dict, Optional, Union, List
 
 import numpy as np
 from nltk.stem import *
@@ -34,15 +36,15 @@ class ArticlesParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         self._previous_tag, self._current_tag = self._current_tag, tag
-        self._previous_data, self._current_data = self._current_data, ''
+        self._previous_data, self._current_data = self._current_data, []
 
     def handle_endtag(self, tag):
         if tag == 'title':
-            self._title = self._current_data
+            self._title = ''.join(self._current_data)
         elif tag == 'bdy':
-            self._bdy = self._current_data
+            self._bdy = ''.join(self._current_data)
         elif tag == 'id' and self._previous_tag == 'title':
-            self._title_id = int(self._current_data)
+            self._title_id = ''.join(self._current_data)
         elif tag == 'article':
             self.articles.append(Article(self._title, self._title_id, self._bdy))
 
@@ -57,37 +59,34 @@ class InvertedIndex:
     def __init__(self):
         self.tokens: Dict[str, Union[list, np.array]] = {}
         self.articles: Dict[int, Path] = {}
+        self.article_count: int = 0
 
-    def populate(self, path: Path, articles_total: int = 281782):
-        documents = path.iterdir()
+    def populate(self, path: Union[str, PathLike[str]], articles_total: int = 281782):
+        documents = Path(path).iterdir()
         # __benchmark__ {
-        articles_processed = 0
         start = perf_counter()
         # __benchmark__ }
-        for document in documents:
-            for article in get_articles(document):
-                for token in text2tokens(article.bdy):
-                    if token in self.tokens:
-                        self.tokens[token].append(article.title_id)
-                    else:
-                        self.tokens[token] = [article.title_id]
-                self.articles[article.title_id] = document
-                if articles_processed == articles_total:
-                    break
+        with ProcessPoolExecutor() as executor:
+            futures = {executor.submit(get_tokens_for_document, document): document for document in documents}
+            for future in as_completed(futures):
+                for article_title_id in future.result():
+                    for token in future.result()[article_title_id]:
+                        if token in self.tokens:
+                            self.tokens[token].append(article_title_id)
+                        else:
+                            self.tokens[token] = [article_title_id]
+                    self.article_count += 1
+                    self.articles[article_title_id] = futures[future]
+                    if self.article_count == articles_total:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
                 # __benchmark__ {
-                articles_processed += 1
-                articles_per_second = articles_processed / (perf_counter() - start)
-                seconds_remaining = (articles_total - articles_processed) / articles_per_second
-                print(f'\rIndexing: {articles_processed}/{articles_total} ({articles_per_second:.2f} articles/s)',
+                articles_per_second = self.article_count / (perf_counter() - start)
+                seconds_remaining = (articles_total - self.article_count) / articles_per_second
+                print(f'\rIndexing: {self.article_count}/{articles_total} ({articles_per_second:.2f} articles/s)',
                       f'[Estimated remaining time: {timedelta(seconds=seconds_remaining)}]', end='')
                 # __benchmark__ }
-            if articles_processed == articles_total:
-                break
-        # __benchmark__ {
-        print()
-        articles_per_second = articles_processed / (perf_counter() - start)
-        print(f'Estimated total indexing time: {timedelta(seconds=281782 / articles_per_second)}')
-        # __benchmark__ }
+            print()
         self._optimise()
 
     def _optimise(self):
@@ -189,9 +188,14 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
         parser.articles.clear()
 
 
+def get_tokens_for_document(document: Path) -> dict[int, List[str]]:
+    # TODO: move list comprehension to text2tokens
+    return {article.title_id: [token for token in text2tokens(article.bdy)] for article in get_articles(document)}
+
+
 def main():
     index = InvertedIndex()
-    index.populate(Path('../dataset/wikipedia articles'), articles_total=2276)
+    index.populate(Path('../dataset/wikipedia articles'))
     index.dump()
     return
 
