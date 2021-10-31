@@ -3,7 +3,7 @@ This file contains your code to create the inverted index. Besides implementing 
 """
 import pickle
 import re
-import string
+import unittest
 from collections import namedtuple
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
@@ -13,15 +13,28 @@ from pathlib import Path
 from time import perf_counter
 from typing import Generator, Dict, Optional, Union, List
 
+import nltk  # Import nltk for downloading the list of stopwords
 import numpy as np
-from nltk.stem import *
+from nltk.corpus import stopwords  # Allowed stopwords list
+from nltk.stem import *  # Allowed stemming library
 
-APOSTROPHES_REGEX = r'[\'`´]'
-HYPHEN_REGEX = r'(?<=\d)[-–—―](?<=\d)'
+APOSTROPHES_REGEX = r'[\u0022\u0027\u0060\u00AB\u00B4\u00BB\u2018\u2019\u201B\u201C\u201D\u201E\u201F\u2039\u203A' \
+                    r'\u275B\u275C\u275D\u275E\u275F\u276E\u276F]'  # Unicode apostrophes
+# HYPHEN_REGEX = r'(?<=\d)[-–—―](?<=\d)'
+HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40' \
+               r'\u2E5D\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D\u10EAD' \
+               r'\u005F\u203F\u2040\u2054\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]'  # Unicode 'Punctuation, Dash' and
+# 'Punctuation, Connector'
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
+stemmer = SnowballStemmer("english", ignore_stopwords=False)
+stemmer_cache = {}
+nltk.download('stopwords')
+stop_words = stopwords.words('english')
+
+# TODO maybe ignore stopwords to improve performance
+
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
-stemmer = PorterStemmer()
 
 
 class ArticlesParser(HTMLParser):
@@ -77,9 +90,6 @@ class InvertedIndex:
                             self.tokens[token] = [article_title_id]
                     self.article_count += 1
                     self.articles[article_title_id] = futures[future]
-                    if self.article_count == articles_total:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        break
                 # __benchmark__ {
                 articles_per_second = self.article_count / (perf_counter() - start)
                 seconds_remaining = (articles_total - self.article_count) / articles_per_second
@@ -133,50 +143,82 @@ def text2tokens(text):
     # TODO: remove stop words
     # TODO: handle special characters, multi-blanks, punctuation
     # TODO: test preprocessing (here points are given)!
-    for token in tokenize(text):
-        token = token.lower()
-        yield stem(token)
+
+    tokens = tokenize(text)
+    tokens = lowercase(tokens)
+    tokens = stem(tokens)
+    tokens = remove_stop_words(tokens)
+
+    return list(tokens)
 
 
 def tokenize(text):
     """
     :param text: input text
-    :return: single tokens seperated by whitespace
+    :return: single tokens found in the input text
     """
+    # First split text at whitespaces since we do not build a biword index
+    tokens = split_at_whitespaces(text)
+    # Remove everything after apostrophes (including the apostrophe itself)
+    tokens = remove_apostrophes(tokens)
+    # Split at hyphens to safe hyphenated sequence as two tokens
+    tokens = remove_hyphen(tokens)
+    # Remove any punctuations
+    tokens = remove_punctuation(tokens)
+
+    yield from tokens
+
+
+def split_at_whitespaces(text):
     for word in text.split():
-        word = remove_apostrophes(word)
-        word = remove_punctuation(word)
-        if word != "":  # remove "empty" words (if after removal nothing is left)
-            yield from remove_hyphen(word)
-
-
-def remove_apostrophes(token):
-    # return token.split("'")[0]
-    return re.split(APOSTROPHES_REGEX, token)[0]
-
-
-def remove_hyphen(token):
-    # remove hyphen only for words but not for numbers
-    # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
-    for word in re.split(HYPHEN_REGEX, token):
         yield word
 
 
-def remove_punctuation(token):
-    # return re.split('\.|,|;', token)[0]
+def remove_apostrophes(tokens):
+    for token in tokens:
+        yield re.split(APOSTROPHES_REGEX, token)[0]
+
+
+def remove_hyphen(tokens):
+    for token in tokens:
+        for portion in re.split(HYPHEN_REGEX, token):
+            yield portion
+
+
+def remove_punctuation(tokens):
     # remove punctuation only from words not for numbers
     # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
-    token = re.sub(PUNCTUATION_REGEX, '', token)
-    return token.strip(string.punctuation)  # to cover (1856–1953)
+    for token in tokens:
+        token = re.sub(PUNCTUATION_REGEX, '', token)
+        token = token.strip()
+        if token:  # matches empty string ''
+            yield token
 
 
-def stem(term):
+def lowercase(tokens):
+    for token in tokens:
+        yield token.lower()
+
+
+def stem(tokens):
     """
     This method uses the NLTK Porter stemmer
-    :param term: A term string ready for stemming
-    :return: the stemmed string
+    :param tokens: A string ready for stemming
+    :return: The stemmed string
     """
-    return stemmer.stem(term)
+    for token in tokens:
+        if token in stemmer_cache:
+            yield stemmer_cache[token]
+        else:
+            stemmed_token = stemmer.stem(token)
+            stemmer_cache[token] = stemmed_token
+            yield stemmed_token
+
+
+def remove_stop_words(tokens):
+    for token in tokens:
+        if token not in stop_words:
+            yield token
 
 
 def get_articles(document: Path) -> Generator[Article, None, None]:
@@ -189,40 +231,48 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
 
 
 def get_tokens_for_document(document: Path) -> dict[int, List[str]]:
-    # TODO: move list comprehension to text2tokens
-    return {article.title_id: [token for token in text2tokens(article.bdy)] for article in get_articles(document)}
+    return {article.title_id: text2tokens(article.bdy) for article in get_articles(document)}
+
+
+class TestTextPreProcessing(unittest.TestCase):
+
+    def test_remove_apostrophes(self):
+        input_text = ['nation\'s', 'Australia\'s', 'other\'s', 'another`s', 'different´s', 'apostrophes', 'Cabezón\'\'']
+        expected_text = ['nation', 'Australia', 'other', 'another', 'different', 'apostrophes', 'Cabezón']
+        self.assertEqual(list(remove_apostrophes(input_text)), expected_text)
+
+    def test_remove_hyphen(self):
+        input_text = ['simple-hyphen', 'ndash–hyphen', 'mdash—hyphen', ' horbar―hyphen', '0-679-73392-2',
+                      '  1805–1872', ' (1856–1953)']
+        expected_text = ['simple', 'hyphen', 'ndash', 'hyphen', 'mdash', 'hyphen', ' horbar', 'hyphen',
+                         '0', '679', '73392', '2', '  1805', '1872', ' (1856', '1953)']
+        self.assertEqual(list(remove_hyphen(input_text)), expected_text)
+
+    def test_remove_punctuation(self):
+        input_text = ['Apostrophes:', ' , ', ' men. ', 's,', '(commanding),', '2.74', '(((.corps)', 's).']
+        expected_text = ['Apostrophes', 'men', 's', 'commanding', '2.74', 'corps', 's']
+        self.assertEqual(list(remove_punctuation(input_text)), expected_text)
+
+    def test_stemming(self):
+        input_text = ['caresses', 'flies', 'flies', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned',
+                      'humbled', 'sized',
+                      'meeting', 'stating', 'siezing', 'itemization', 'sensational', 'traditional', 'reference',
+                      'colonizer', 'plotted']
+        expected_text = ['caress', 'fli', 'fli', 'fli', 'die', 'mule', 'deni', 'die', 'agre', 'own', 'humbl', 'size',
+                         'meet', 'state', 'siez', 'item', 'sensat', 'tradit', 'refer', 'colon', 'plot']
+        self.assertEqual(list(stem(input_text)), expected_text)
+
+    def test_remove_stop_words(self):
+        input_text = ['i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope', "you're", "you've",
+                      'stillhere']
+        expected_text = ['notremoved', 'stays', 'nope', 'stillhere']
+        self.assertEqual(list(remove_stop_words(input_text)), expected_text)
 
 
 def main():
     index = InvertedIndex()
-    index.populate(Path('../dataset/wikipedia articles'))
+    index.populate('../dataset/wikipedia articles')
     index.dump()
-    return
-
-    """plurals = ['caresses', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned', 'humbled', 'sized', 'meeting',
-               'stating', 'siezing', 'itemization', 'sensational', 'traditional', 'reference', 'colonizer', 'plotted']
-
-    singles = [stem(plural) for plural in plurals]
-    print(' '.join(singles))"""
-
-    test_inputtext = "Apostrophes: nation's Australia's other's another`s different´s apostrophes" \
-                     "Hyphens: simple-hyphen ndash–hyphen mdash—hyphen horbar―hyphen ISBN 0-679-73392-2  1805–1872 (1856–1953) " \
-                     "Infobox Football biography Defender/Sweeper Cabezón'' San Lorenzo de Almagro Chivas UAG Tecos" \
-                     " Independiente Elche CF Club América San Lorenzo de Almagro 097 0(7) gold medal s in the nation's " \
-                     "best in the nation's Australia's other's another`s different´s apostrophes rifled musket s," \
-                     "rifled musket s, repeating rifles , and fortified entrenchment s contributed to the death of many" \
-                     " men. General s and other officers , many professionally trained in tactics from the Napoleonic " \
-                     "Wars , were often slow to develop changes in tactics in response. Outbreak of war companies " \
-                     " ((each with roughly 100 men and led by a captain , with associated lieutenant s). Field" \
-                     " officers normally included a colonel  (commanding), most frequent corps per army 1  4  2.74 2  divisions per (((.corps)  ( Rifle &amp; Light pages 180-81"
-
-    for token in text2tokens(test_inputtext):
-        print(token)
-
-    # Test apostrophes
-    print("---- apostophes test ----")
-    apostrophes_test = "in the nation's Australia's other's another`s different´s apostrophes"
-    print(remove_apostrophes(apostrophes_test))
 
 
 if __name__ == "__main__":
