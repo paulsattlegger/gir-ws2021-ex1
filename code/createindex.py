@@ -26,6 +26,8 @@ PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
 
+stemmer_cache = {}
+
 
 # TODO maybe ignore stopwords to improve performance
 
@@ -197,11 +199,16 @@ def lowercase(tokens):
 def stem(tokens):
     """
     This method uses the NLTK Porter stemmer
-    :param term: A term string ready for stemming
-    :return: the stemmed string
+    :param tokens: A string ready for stemming
+    :return: The stemmed string
     """
     for token in tokens:
-        yield stemmer.stem(token)
+        if token in stemmer_cache:
+            yield stemmer_cache[token]
+        else:
+            stemmed_token = stemmer.stem(token)
+            stemmer_cache[token] = stemmed_token
+            yield stemmed_token
 
 
 def get_articles(document: Path) -> Generator[Article, None, None]:
@@ -244,7 +251,7 @@ class TestTextPreProcessing(unittest.TestCase):
 
 def main():
     index = InvertedIndex()
-    index.populate(Path('../dataset/wikipedia articles'), articles_total=2276)
+    index.populate(Path('../dataset/wikipedia articles'), articles_total=200)
     index.dump()
 
 if __name__ == "__main__":
