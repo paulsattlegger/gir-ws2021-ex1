@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 from os import PathLike
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, Optional, Union
+from typing import Generator, Dict, Optional, Union, AnyStr
 
 import numpy as np
 from nltk.corpus import stopwords  # Allowed stopwords list
@@ -72,7 +72,7 @@ class InvertedIndex:
         self.articles: Dict[int, Path] = {}
         self.article_count: int = 0
 
-    def populate(self, path: Union[str, PathLike[str]], articles_total: int = 281782):
+    def populate(self, path: Union[str, PathLike[AnyStr]], articles_total: int = 281782):
         documents = Path(path).iterdir()
         # __benchmark__ {
         start = perf_counter()
@@ -232,7 +232,7 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
         parser.articles.clear()
 
 
-def get_tokens_for_document(document: Path) -> dict[int, Counter[str]]:
+def get_tokens_for_document(document: Path) -> Dict[int, Counter[AnyStr]]:
     return {article.title_id: Counter(text2tokens(article.bdy)) for article in get_articles(document)}
 
 
