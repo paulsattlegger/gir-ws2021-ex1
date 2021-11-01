@@ -4,7 +4,7 @@ This file contains your code to create the inverted index. Besides implementing 
 import pickle
 import re
 import unittest
-from collections import namedtuple, Counter
+from collections import namedtuple, Counter, defaultdict
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from html.parser import HTMLParser
@@ -68,7 +68,7 @@ class InvertedIndex:
     dump_file = Path('../index.obj')
 
     def __init__(self):
-        self.tokens: Dict[str, Union[list[list, list], np.array]] = {}
+        self.tokens: Dict[str, Union[list, np.array]] = defaultdict(list)
         self.articles: Dict[int, Path] = {}
         self.article_count: int = 0
 
@@ -83,11 +83,8 @@ class InvertedIndex:
                 tokens_for_document = future.result()
                 for article_title_id, tokens in tokens_for_document.items():
                     for token, cnt in tokens.items():
-                        if token in self.tokens:
-                            self.tokens[token][0].append(article_title_id)
-                            self.tokens[token][1].append(cnt)
-                        else:
-                            self.tokens[token] = [[article_title_id], [cnt]]
+                        self.tokens[token].append(article_title_id)
+                        self.tokens[token].append(cnt)
                     self.article_count += 1
                     self.articles[article_title_id] = futures[future]
                 # __benchmark__ {
@@ -106,7 +103,9 @@ class InvertedIndex:
         start = perf_counter()
         # __benchmark__ }
         for token in self.tokens:
-            self.tokens[token] = np.array(self.tokens[token], dtype=np.int32)
+            self.tokens[token] = np.array(self.tokens[token], dtype=np.uint32)
+            self.tokens[token] = np.reshape(self.tokens[token], newshape=(-1, 2))
+            self.tokens[token] = np.sort(self.tokens[token], axis=0)
         # __benchmark__ {
         print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }

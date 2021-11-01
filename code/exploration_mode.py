@@ -10,10 +10,11 @@ if __name__ == '__main__':
     index = InvertedIndex.load()
 
     queries = ['fine', 'art', 'england', '2000']
+    searches = [index.search(query) for query in queries]
 
-    ar1 = index.search(queries[0])[0]
+    ar1 = searches[0][:, 0]
     for i in range(1, len(queries)):
-        ar2 = index.search(queries[i])[0]
+        ar2 = searches[1][:, 0]
         ar1 = np.intersect1d(ar1, ar2, assume_unique=True)
 
     article_1 = int(ar1[0])
