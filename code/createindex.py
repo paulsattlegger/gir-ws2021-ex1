@@ -87,6 +87,7 @@ class InvertedIndex:
                         self.tokens[token].append(cnt)
                     self.article_count += 1
                     self.articles[article_title_id] = futures[future]
+                del futures[future]
                 # __benchmark__ {
                 articles_per_second = self.article_count / (perf_counter() - start)
                 seconds_remaining = (articles_total - self.article_count) / articles_per_second
@@ -232,7 +233,10 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
 
 
 def get_tokens_for_document(document: Path) -> Dict[int, Counter[AnyStr]]:
-    return {article.title_id: Counter(text2tokens(article.bdy)) for article in get_articles(document)}
+    d = {}
+    for article in get_articles(document):
+        d[article.title_id] = Counter(text2tokens(article.bdy))
+    return d
 
 
 class TestTextPreProcessing(unittest.TestCase):
