@@ -4,16 +4,15 @@ This file contains your code to create the inverted index. Besides implementing 
 import pickle
 import re
 import unittest
-from collections import namedtuple
+from collections import namedtuple, Counter
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from html.parser import HTMLParser
 from os import PathLike
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, Optional, Union, List
+from typing import Generator, Dict, Optional, Union
 
-import nltk  # Import nltk for downloading the list of stopwords
 import numpy as np
 from nltk.corpus import stopwords  # Allowed stopwords list
 from nltk.stem import *  # Allowed stemming library
@@ -29,7 +28,6 @@ PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
 stemmer_cache = {}
-nltk.download('stopwords')
 stop_words = stopwords.words('english')
 
 # TODO maybe ignore stopwords to improve performance
@@ -70,7 +68,7 @@ class InvertedIndex:
     dump_file = Path('../index.obj')
 
     def __init__(self):
-        self.tokens: Dict[str, Union[list, np.array]] = {}
+        self.tokens: Dict[str, Union[list[list, list], np.array]] = {}
         self.articles: Dict[int, Path] = {}
         self.article_count: int = 0
 
@@ -82,12 +80,14 @@ class InvertedIndex:
         with ProcessPoolExecutor() as executor:
             futures = {executor.submit(get_tokens_for_document, document): document for document in documents}
             for future in as_completed(futures):
-                for article_title_id in future.result():
-                    for token in future.result()[article_title_id]:
+                tokens_for_document = future.result()
+                for article_title_id, tokens in tokens_for_document.items():
+                    for token, cnt in tokens.items():
                         if token in self.tokens:
-                            self.tokens[token].append(article_title_id)
+                            self.tokens[token][0].append(article_title_id)
+                            self.tokens[token][1].append(cnt)
                         else:
-                            self.tokens[token] = [article_title_id]
+                            self.tokens[token] = [[article_title_id], [cnt]]
                     self.article_count += 1
                     self.articles[article_title_id] = futures[future]
                 # __benchmark__ {
@@ -97,7 +97,7 @@ class InvertedIndex:
                       f'[Estimated remaining time: {timedelta(seconds=seconds_remaining)}]', end='')
                 # __benchmark__ }
         # __benchmark__ {
-        print(f'\nTotal indexing time: {timedelta(seconds=perf_counter() - start)}', end='')
+        print(f'\nTotal indexing time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
         self._optimise()
 
@@ -106,9 +106,9 @@ class InvertedIndex:
         start = perf_counter()
         # __benchmark__ }
         for token in self.tokens:
-            self.tokens[token] = np.array(self.tokens[token])
+            self.tokens[token] = np.array(self.tokens[token], dtype=np.int32)
         # __benchmark__ {
-        print(f'\nTotal index optimisation time: {timedelta(seconds=perf_counter() - start)}')
+        print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
 
     def fetch(self, article_title_id: int) -> Optional[Article]:
@@ -232,8 +232,8 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
         parser.articles.clear()
 
 
-def get_tokens_for_document(document: Path) -> dict[int, List[str]]:
-    return {article.title_id: text2tokens(article.bdy) for article in get_articles(document)}
+def get_tokens_for_document(document: Path) -> dict[int, Counter[str]]:
+    return {article.title_id: Counter(text2tokens(article.bdy)) for article in get_articles(document)}
 
 
 class TestTextPreProcessing(unittest.TestCase):

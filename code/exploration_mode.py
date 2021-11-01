@@ -11,10 +11,10 @@ if __name__ == '__main__':
 
     queries = ['fine', 'art', 'england', '2000']
 
-    ar1 = index.search(queries[0])
+    ar1 = index.search(queries[0])[0]
     for i in range(1, len(queries)):
-        ar2 = index.search(queries[i])
-        ar1 = np.intersect1d(ar1, ar2)
+        ar2 = index.search(queries[i])[0]
+        ar1 = np.intersect1d(ar1, ar2, assume_unique=True)
 
     article_1 = int(ar1[0])
     print(index.fetch(article_1).bdy)
