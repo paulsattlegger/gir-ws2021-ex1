@@ -8,6 +8,7 @@ from collections import namedtuple, Counter, defaultdict
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from html.parser import HTMLParser
+from itertools import islice
 from pathlib import Path
 from time import perf_counter
 from typing import Generator, Dict, Optional, Union
@@ -73,6 +74,8 @@ class InvertedIndex:
 
     def populate(self, path: str, articles_total: int = 281782):
         documents = Path(path).iterdir()
+        # TODO: remove in final version
+        documents = islice(documents, 25)
         # __benchmark__ {
         start = perf_counter()
         # __benchmark__ }
