@@ -3,12 +3,14 @@ This file contains your code for the interactive exploration mode where a string
 Make sure that the user can switch between TF-IDF and BM25 scoring functions.
 """
 from typing import Dict
-from numpy.typing import NDArray
-from createindex import InvertedIndex
+
 import numpy as np
+from numpy.typing import NDArray
+
+from createindex import InvertedIndex
 
 
-def calc_query_vector(query: Dict[str, int], total_num_articles, dfs: NDArray[int]):
+def calc_query_vector(query: Dict[str, int], query_dict: dict, total_num_articles, dfs: NDArray[int]):
     query_vector = np.zeros(len(query_dict), dtype=float)
     idfs = np.where(dfs > 0, np.log(total_num_articles / dfs), 0)
     for i, word in enumerate(query):
@@ -41,7 +43,7 @@ def calc_tf_idf_for_all_articles(results, total_num_articles):
 
 
 def rank(articles: Dict[int, NDArray[float]], query_vector: NDArray[float], method="cosine"):
-    assert method in ('cosine', 'sum'), "Invalid method '{}'".format(method)
+    assert method in ('cosine', 'sum'), f'Invalid method "{method}"'
     ranked_articles = np.zeros((len(articles), 2), dtype=float)
     norm_q_vec = np.linalg.norm(query_vector)
     for i, article_key in enumerate(articles):
@@ -55,6 +57,7 @@ def rank(articles: Dict[int, NDArray[float]], query_vector: NDArray[float], meth
     ranked_articles = ranked_articles[ranked_articles[:, 1].argsort()]
     return ranked_articles[::-1]
 
+
 def create_query_dict(query: str):
     words = query.split(" ")
     # get unique words and occurrences
@@ -66,7 +69,8 @@ def create_query_dict(query: str):
             query_dict[word] = 1
     return query_dict
 
-if __name__ == '__main__':
+
+def main():
     index = InvertedIndex.load('../index.obj')
     article_count = index.article_count
 
@@ -84,7 +88,7 @@ if __name__ == '__main__':
         else:
             dfs[i] = len(result)
 
-    query_vector = calc_query_vector(query_dict, article_count, dfs)
+    query_vector = calc_query_vector(query_dict, query_dict, article_count, dfs)
     articles_with_tf_idf = calc_tf_idf_for_all_articles(results, article_count)
     ranked = rank(articles_with_tf_idf, query_vector, method="cosine")
 
@@ -92,3 +96,7 @@ if __name__ == '__main__':
         article = index.fetch(ranked[i][0])
         print("article id: ", ranked[i][0])
         print(article.bdy)
+
+
+if __name__ == '__main__':
+    main()
