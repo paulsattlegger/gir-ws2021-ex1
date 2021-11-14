@@ -2,12 +2,13 @@
 This file contains your code for the interactive exploration mode where a string can be input by a user and a ranked list of documents is returned.
 Make sure that the user can switch between TF-IDF and BM25 scoring functions.
 """
+from collections import Counter
 from typing import Dict
 
 import numpy as np
 from numpy.typing import NDArray
 
-from createindex import InvertedIndex
+from createindex import InvertedIndex, text2tokens
 
 
 def calc_query_vector(query: Dict[str, int], query_dict: dict, total_num_articles, dfs: NDArray[int]):
@@ -59,15 +60,8 @@ def rank(articles: Dict[int, NDArray[float]], query_vector: NDArray[float], meth
 
 
 def create_query_dict(query: str):
-    words = query.split(" ")
-    # get unique words and occurrences
-    query_dict: Dict[str, int] = {}
-    for word in words:
-        if word in query_dict:
-            query_dict[word] = query_dict[word] + 1
-        else:
-            query_dict[word] = 1
-    return query_dict
+    tokens = text2tokens(query)
+    return Counter(tokens)
 
 
 def main():
