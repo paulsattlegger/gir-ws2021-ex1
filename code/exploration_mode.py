@@ -10,13 +10,17 @@ if __name__ == '__main__':
     index = InvertedIndex.load('../index.obj')
     article_count = index.article_count
 
-    queries = ['fine', 'art', 'england', '2000']
-    searches = [index.search(query) for query in queries]
+    print("What do you want to search?")
+    query = input()
+    found = index.search(query)
+    if found is not None and len(found) > 0:
+        sortedArr = found[found[:, 1].argsort()]
+        sortedArr = sortedArr[::-1]
 
-    ar1 = searches[0][:, 0]
-    for i in range(1, len(queries)):
-        ar2 = searches[1][:, 0]
-        ar1 = np.intersect1d(ar1, ar2, assume_unique=True)
+        for i in range(min(len(sortedArr), 5)):
+            article = index.fetch(sortedArr[i][0])
+            print("article id: ", sortedArr[i][0])
+            print(article.bdy)
+    else:
+        print("Nothing found")
 
-    article_1 = int(ar1[0])
-    print(index.fetch(article_1).bdy)
