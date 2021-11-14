@@ -106,7 +106,7 @@ class InvertedIndex:
         for token in self._tokens:
             self._tokens[token] = np.array(self._tokens[token], dtype=np.uint32)
             self._tokens[token] = np.reshape(self._tokens[token], newshape=(-1, 2))
-            self._tokens[token] = np.sort(self._tokens[token], axis=0)
+            self._tokens[token] = self._tokens[token][self._tokens[token][:, 0].argsort()]
         # __benchmark__ {
         print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
