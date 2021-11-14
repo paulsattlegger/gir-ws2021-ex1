@@ -7,7 +7,8 @@ from createindex import InvertedIndex
 import numpy as np
 
 if __name__ == '__main__':
-    index = InvertedIndex.load()
+    index = InvertedIndex.load('../index.obj')
+    article_count = index.article_count
 
     queries = ['fine', 'art', 'england', '2000']
     searches = [index.search(query) for query in queries]

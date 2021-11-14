@@ -65,12 +65,10 @@ class ArticlesParser(HTMLParser):
 
 
 class InvertedIndex:
-    dump_file = Path('../index.obj')
-
     def __init__(self):
-        self.tokens: Dict[str, Union[list, np.array]] = defaultdict(list)
-        self.articles: Dict[int, Path] = {}
         self.article_count: int = 0
+        self._tokens: Dict[str, Union[list, np.array]] = defaultdict(list)
+        self._articles: Dict[int, Path] = {}
 
     def populate(self, path: str, articles_total: int = 281782):
         documents = Path(path).iterdir()
@@ -85,10 +83,10 @@ class InvertedIndex:
                 tokens_for_document = future.result()
                 for article_title_id, tokens in tokens_for_document.items():
                     for token, cnt in tokens.items():
-                        self.tokens[token].append(article_title_id)
-                        self.tokens[token].append(cnt)
+                        self._tokens[token].append(article_title_id)
+                        self._tokens[token].append(cnt)
                     self.article_count += 1
-                    self.articles[article_title_id] = futures[future]
+                    self._articles[article_title_id] = futures[future]
                 del futures[future]
                 # __benchmark__ {
                 articles_per_second = self.article_count / (perf_counter() - start)
@@ -105,35 +103,37 @@ class InvertedIndex:
         # __benchmark__ {
         start = perf_counter()
         # __benchmark__ }
-        for token in self.tokens:
-            self.tokens[token] = np.array(self.tokens[token], dtype=np.uint32)
-            self.tokens[token] = np.reshape(self.tokens[token], newshape=(-1, 2))
-            self.tokens[token] = np.sort(self.tokens[token], axis=0)
+        for token in self._tokens:
+            self._tokens[token] = np.array(self._tokens[token], dtype=np.uint32)
+            self._tokens[token] = np.reshape(self._tokens[token], newshape=(-1, 2))
+            self._tokens[token] = np.sort(self._tokens[token], axis=0)
         # __benchmark__ {
         print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
 
     def fetch(self, article_title_id: int) -> Optional[Article]:
-        document = self.articles[article_title_id]
+        document = self._articles[article_title_id]
         for article in get_articles(document):
             if article.title_id == article_title_id:
                 return article
 
     def search(self, term: str) -> Optional[Union[list, np.array]]:
-        return self.tokens.get(term)
+        return self._tokens.get(term)
 
-    def dump(self):
-        with InvertedIndex.dump_file.open('wb') as file:
+    def dump(self, path: str):
+        path = Path(path)
+        with path.open('wb') as file:
             pickle.dump(self, file)
-        print(f'Bytes written: {InvertedIndex.dump_file.stat().st_size:}')
+        print(f'Bytes written: {path.stat().st_size:}')
 
     @staticmethod
-    def load() -> 'InvertedIndex':
-        with InvertedIndex.dump_file.open('rb') as file:
+    def load(path: str) -> 'InvertedIndex':
+        path = Path(path)
+        with path.open('rb') as file:
             return pickle.load(file)
 
     def __str__(self):
-        return str(self.tokens)
+        return str(self._tokens)
 
 
 def text2tokens(text):
@@ -279,7 +279,7 @@ class TestTextPreProcessing(unittest.TestCase):
 def main():
     index = InvertedIndex()
     index.populate('../dataset/wikipedia articles')
-    index.dump()
+    index.dump('../index.obj')
 
 
 if __name__ == "__main__":
