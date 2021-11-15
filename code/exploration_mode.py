@@ -86,9 +86,11 @@ def main():
     articles_with_tf_idf = calc_tf_idf_for_all_articles(results, article_count)
     ranked = rank(articles_with_tf_idf, query_vector, method="cosine")
 
-    for i in range(min(len(ranked), 5)):
-        article = index.fetch(ranked[i][0])
-        print("article id: ", ranked[i][0])
+    article_title_ids = [ranked[i][0] for i in range(min(len(ranked), 5))]
+    articles = index.fetch(*article_title_ids)
+
+    for article in articles:
+        print("article id: ", article.title_id)
         print(article.bdy)
 
 
