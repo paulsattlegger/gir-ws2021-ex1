@@ -7,7 +7,7 @@ from engine import Engine
 
 
 def main():
-    engine = Engine(force_reindexing=True)
+    engine = Engine()
     method = "tf-idf"
 
     while True:
