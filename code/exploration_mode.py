@@ -20,7 +20,7 @@ def main():
         elif query == ":t":
             method = "tf-idf"
         elif query == ":b":
-            method="bm25"
+            method = "bm25"
         else:
             engine.search_and_print(query, scoring_method=method)
 

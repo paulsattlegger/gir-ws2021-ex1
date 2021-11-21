@@ -6,7 +6,6 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import List, Optional
 from engine import Engine
-from createindex import InvertedIndex
 
 # TODO: aim scoring TF-IDF 0.20 %, BM25 0.22-0.23 %
 # TODO: parse topic file and get query id for relevant documents
