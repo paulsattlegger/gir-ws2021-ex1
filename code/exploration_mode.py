@@ -5,7 +5,7 @@ Make sure that the user can switch between TF-IDF and BM25 scoring functions.
 from collections import Counter
 from typing import Dict
 import numpy as np
-from scoring import TFIDFScoring
+from scoring import TFIDFScoring, BM25Scoring
 from createindex import InvertedIndex, text2tokens
 
 
@@ -36,8 +36,10 @@ def main():
     query = "yellow yellow yellow dog england forest"
     query_dict = create_query_dict(query)
     results, dfs = search(query_dict, index)
-    scoring = TFIDFScoring(article_count)
-    ranked = scoring.rank_articles(query_dict, results, dfs)
+    tfidf_scoring = TFIDFScoring(article_count)
+    bm25_scoring = BM25Scoring(article_count)
+
+    ranked = bm25_scoring.rank_articles(query_dict, results, dfs)
     article_title_ids = [ranked[i].key for i in range(min(len(ranked), 5))]
     articles = index.fetch(*article_title_ids)
 
