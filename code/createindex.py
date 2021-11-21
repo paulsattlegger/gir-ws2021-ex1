@@ -7,6 +7,7 @@ import unittest
 from collections import namedtuple, Counter, defaultdict
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
+from functools import cached_property
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
@@ -26,15 +27,13 @@ HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u
 # 'Punctuation, Connector'
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
+# TODO maybe ignore stopwords to improve performance
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
 stemmer_cache = {}
 stop_words = stopwords.words('english')
 
-# TODO maybe ignore stopwords to improve performance
-
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
-# TODO: change search to this?
-Posting = namedtuple("Posting", ["article_title_id", "tf"])
+Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
 
 
 class ArticlesParser(HTMLParser):
@@ -69,8 +68,13 @@ class ArticlesParser(HTMLParser):
 class InvertedIndex:
     def __init__(self):
         self.article_count: int = 0
+        self._total_article_len: int = 0
         self._tokens: Dict[str, Union[list, np.array]] = defaultdict(list)
-        self._articles: Dict[int, Path] = {}
+        self._articles: Dict[int, tuple] = {}
+
+    @cached_property
+    def avg_article_len(self):
+        return self._total_article_len / self.article_count
 
     def populate(self, path: str, articles_total: int = 281782):
         documents = Path(path).iterdir()
@@ -88,8 +92,13 @@ class InvertedIndex:
                         self._tokens[token].append(article_title_id)
                         self._tokens[token].append(cnt)
                     self.article_count += 1
-                    self._articles[article_title_id] = futures[future]
-                del futures[future]
+                    document = futures[future]
+                    # TODO: tokens.total() (requires Python 3.10)
+                    # maybe len(article.bdy) instead of tokens count
+                    article_len = sum(tokens.values())
+                    self._articles[article_title_id] = document, article_len
+                    self._total_article_len += tokens.total()
+                del document
                 # __benchmark__ {
                 articles_per_second = self.article_count / (perf_counter() - start)
                 seconds_remaining = (articles_total - self.article_count) / articles_per_second
@@ -114,18 +123,15 @@ class InvertedIndex:
         # __benchmark__ }
 
     def fetch(self, *article_title_ids: int) -> Generator[Article, None, None]:
-        for document in {self._articles[article_title_id] for article_title_id in article_title_ids}:
+        for document in {self._articles[article_title_id] for article_title_id, _ in article_title_ids}:
             for article in get_articles(document):
                 if article.title_id in article_title_ids:
                     yield article
 
-    def search(self, term: str) -> Optional[Union[list, np.array]]:
-        return self._tokens.get(term)
-
-    # TODO: change search to this?
-    # def search(self, term: str) -> Generator[Posting, None, None]:
-    # for article_title_id, tf in self._tokens.get(term):
-    #     yield Posting(article_title_id, tf)
+    def search(self, term: str) -> Generator[Posting, None, None]:
+        for article_title_id, tf in self._tokens.get(term):
+            _, article_len = self._articles[article_title_id]
+            yield Posting(article_title_id, article_len, tf)
 
     def dump(self, path: str):
         path = Path(path)
@@ -211,6 +217,7 @@ def lowercase(tokens):
         yield token.lower()
 
 
+# TODO: functools @cached?
 def stem(tokens):
     """
     This method uses the NLTK Porter stemmer
