@@ -28,15 +28,8 @@ class Engine(ABC):
         return Counter(tokens)
 
     def _retrieve_docs(self, query_dict: Dict[str, int]):
-        results = []
-        dfs = np.zeros(len(query_dict), dtype=int)
-        for i, word in enumerate(query_dict):
-            result = self.index.search(word)
-            results.append(result)
-            if result is None:
-                dfs[i] = 0
-            else:
-                dfs[i] = len(result)
+        results = [self.index.search(word) for word in query_dict]
+        dfs = list(map(lambda x: 0 if x is None else len(x), results))
         return results, dfs
 
     def search(self, query: str, scoring_method="tf-idf"):

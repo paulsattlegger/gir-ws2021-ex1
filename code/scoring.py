@@ -20,9 +20,10 @@ class Scoring(ABC):
         self._total_num_articles = total_num_articles
         self.method = method
 
-    def _calc_query_vector(self, query: Dict[str, int], query_dict: dict, dfs: NDArray[int]):
+    def _calc_query_vector(self, query: Dict[str, int], query_dict: dict, dfs: List[int]):
+        dfs_np = np.array(dfs)
         query_vector = np.zeros(len(query_dict), dtype=float)
-        idfs = np.where(dfs > 0, np.log(self._total_num_articles / dfs), 0)
+        idfs = np.where(dfs_np > 0, np.log(self._total_num_articles / dfs_np), 0)
         for i, word in enumerate(query):
             query_vector[i] = np.log(1 + query[word]) * idfs[i]
         return query_vector
@@ -37,20 +38,21 @@ class Scoring(ABC):
         pass
 
     def _calc_score_for_all_articles(self, results):
-        scored_articles: Dict[int, NDArray[float]] = {}
-        for i, found_articles_by_word in enumerate(results):
-            if found_articles_by_word is None or len(found_articles_by_word) == 0:
+        scored_docs: Dict[int, NDArray[float]] = {}
+        for i, found_docs_by_word in enumerate(results):
+            if found_docs_by_word is None or len(found_docs_by_word) == 0:
                 continue
-            token_freq = found_articles_by_word[:, 1]
-            tf_idf = self._calc_score(token_freq, len(found_articles_by_word))
 
-            for k, article in enumerate(found_articles_by_word):
-                if article[0] in scored_articles:
-                    scored_articles.get(article[0])[i] = tf_idf[k]
+            token_freq = found_docs_by_word[:, 1]
+            score = self._calc_score(token_freq, len(found_docs_by_word))
+
+            for k, doc in enumerate(found_docs_by_word):
+                if doc[0] in scored_docs:
+                    scored_docs.get(doc[0])[i] = score[k]
                 else:
-                    scored_articles[article[0]] = np.zeros(len(results), dtype=float)
-                    scored_articles[article[0]][i] = tf_idf[k]
-        return scored_articles
+                    scored_docs[doc[0]] = np.zeros(len(results), dtype=float)
+                    scored_docs[doc[0]][i] = score[k]
+        return scored_docs
 
     def _rank(self, articles: Dict[int, NDArray[float]], query_vector: NDArray[float]):
         ranked_articles: List[ArticleWithScore] = []
@@ -67,7 +69,7 @@ class Scoring(ABC):
         ranked_articles.sort(key=lambda a: a.score, reverse=True)
         return ranked_articles
 
-    def rank_articles(self, query_dict: Dict[str, int], articles, dfs) -> List[ArticleWithScore]:
+    def rank_articles(self, query_dict: Dict[str, int], articles: List, dfs: List[int]) -> List[ArticleWithScore]:
         """
         Ranks all articles by importance
         :param query_dict: All occurred search terms and their frequency in the query
