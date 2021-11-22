@@ -18,7 +18,7 @@ def main():
         print("Commands ':q' = quit | :t' = tf-idf-scoring | ':b' = bm25-scoring")
         print(f"Current scoring method: {method}")
         print("What do you want to search?")
-        query = input()
+        query = input('> ')
 
         if query == ":q":
             break
@@ -38,7 +38,7 @@ def main():
                 print(f"{article.bdy}")
                 print(f"{'-' * get_terminal_size().columns}")
                 print(f"Commands ':n' = next result | '<any>' = new search ")
-                query = input()
+                query = input('> ')
                 if query != ":n":
                     break
 
