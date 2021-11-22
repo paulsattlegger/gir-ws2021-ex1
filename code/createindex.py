@@ -123,7 +123,7 @@ class InvertedIndex:
         # __benchmark__ }
 
     def fetch(self, *article_title_ids: int) -> Generator[Article, None, None]:
-        for document in {self._articles[article_title_id] for article_title_id, _ in article_title_ids}:
+        for document in {self._articles[article_title_id][0] for article_title_id in article_title_ids}:
             for article in get_articles(document):
                 if article.title_id in article_title_ids:
                     yield article

@@ -1,9 +1,8 @@
 from abc import ABC
 from collections import Counter
-from typing import Dict
-import numpy as np
-from scoring import TFIDFScoring, BM25Scoring
 from createindex import InvertedIndex, text2tokens
+from typing import Dict
+from scoring import TFIDFScoring, BM25Scoring
 from pathlib import Path
 
 
@@ -20,7 +19,8 @@ class Engine(ABC):
             self.index.dump(index_file_path)
         else:
             self.index = InvertedIndex.load(index_file_path)
-        self.article_count = self.index.article_count
+        self.article_count: int = self.index.article_count
+        self.avg_article_len: float = self.index.avg_article_len
 
     @staticmethod
     def _create_query_dict(query: str):
@@ -28,28 +28,33 @@ class Engine(ABC):
         return Counter(tokens)
 
     def _retrieve_docs(self, query_dict: Dict[str, int]):
-        results = [self.index.search(word) for word in query_dict]
+        results = [list(self.index.search(word)) for word in query_dict]
         dfs = list(map(lambda x: 0 if x is None else len(x), results))
+
         return results, dfs
 
-    def search(self, query: str, scoring_method="tf-idf"):
+    def search(self, query: str, scoring_method="bm25"):
         assert scoring_method in ('tf-idf', 'bm25'), f'Invalid method "{scoring_method}"'
         query_dict = self._create_query_dict(query)
         results, dfs = self._retrieve_docs(query_dict)
 
         if scoring_method == "tf-idf":
-            scoring = TFIDFScoring(self.article_count)
+            scoring = TFIDFScoring(self.article_count, self.avg_article_len)
         else:
-            scoring = BM25Scoring(self.article_count)
+            scoring = BM25Scoring(self.article_count, self.avg_article_len)
 
         ranked = scoring.rank_articles(query_dict, results, dfs)
         return ranked
 
-    def search_and_print(self, query: str, scoring_method="tf-idf", num_results=3):
+    def search_and_print(self, query: str, scoring_method="bm25", num_results=3):
         ranked = self.search(query, scoring_method)
-        article_title_ids = [ranked[i].key for i in range(min(len(ranked), num_results))]
-        articles = self.index.fetch(*article_title_ids)
+        article_keys = [int(ranked[i].key) for i in range(min(len(ranked), num_results))]
+        articles = list(self.index.fetch(*article_keys))
 
-        for article in articles:
-            print("article id: ", article.title_id)
+        for i, article in enumerate(articles):
+            print(f"Result number: {i + 1}")
+            print(f"Article id: {article.title_id} | Score: {ranked[i].score}")
+            print("-"*100)
             print(article.bdy)
+            print("-"*100)
+            print("\n\n")

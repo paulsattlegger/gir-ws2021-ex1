@@ -4,21 +4,25 @@ from typing import Dict, List
 import numpy as np
 from numpy.typing import NDArray
 
+from createindex import Posting
+
 ArticleWithScore = namedtuple("ArticleWithScore", "key score")
 
 
 class Scoring(ABC):
-    def __init__(self, total_num_articles, method = "cosine"):
+    def __init__(self, total_num_articles: int, avg_doc_length: float, method="cosine"):
         """
         Abstract class for scoring methods
         :param total_num_articles: total number of articles in database
+        :param avg_doc_length: average length of all documents in database
         :param method: defines how the documents are compared to the query,
             "cosine": using cosine similarity
             "sum": just sums all scores for each term
         """
         assert method in ('cosine', 'sum'), f'Invalid method "{method}"'
         self._total_num_articles = total_num_articles
-        self.method = method
+        self._avg_doc_length = avg_doc_length
+        self._method = method
 
     def _calc_query_vector(self, query: Dict[str, int], query_dict: dict, dfs: List[int]):
         dfs_np = np.array(dfs)
@@ -29,22 +33,25 @@ class Scoring(ABC):
         return query_vector
 
     @abstractmethod
-    def _calc_score(self, freq: NDArray[int], df: int):
+    def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
         """
         Calculates scores for each document for one term
         :param freq: token frequency for each document found
         :param df: document frequency for the term
+        :param doc_length: document length / average document length for each document
         """
         pass
 
-    def _calc_score_for_all_articles(self, results):
+    def _calc_score_for_all_articles(self, results: List[List[Posting]]):
         scored_docs: Dict[int, NDArray[float]] = {}
         for i, found_docs_by_word in enumerate(results):
             if found_docs_by_word is None or len(found_docs_by_word) == 0:
                 continue
 
-            token_freq = found_docs_by_word[:, 1]
-            score = self._calc_score(token_freq, len(found_docs_by_word))
+            token_freq: NDArray[int] = np.array(list(map(lambda p: p.tf, found_docs_by_word)))
+            doc_length = np.array(list(map(lambda p: p.article_len, found_docs_by_word)), dtype=float)
+            doc_length = doc_length / self._avg_doc_length
+            score = self._calc_score(token_freq, len(found_docs_by_word), doc_length)
 
             for k, doc in enumerate(found_docs_by_word):
                 if doc[0] in scored_docs:
@@ -59,7 +66,7 @@ class Scoring(ABC):
         norm_q_vec = np.linalg.norm(query_vector)
 
         for article_key in articles:
-            if self.method == "cosine":
+            if self._method == "cosine":
                 norm_a_vec = np.linalg.norm(articles[article_key])
                 score = np.dot(norm_a_vec, norm_q_vec)
             else:
@@ -69,7 +76,10 @@ class Scoring(ABC):
         ranked_articles.sort(key=lambda a: a.score, reverse=True)
         return ranked_articles
 
-    def rank_articles(self, query_dict: Dict[str, int], articles: List, dfs: List[int]) -> List[ArticleWithScore]:
+    def rank_articles(self,
+                      query_dict: Dict[str, int],
+                      articles: List[List[Posting]],
+                      dfs: List[int]) -> List[ArticleWithScore]:
         """
         Ranks all articles by importance
         :param query_dict: All occurred search terms and their frequency in the query
@@ -84,7 +94,7 @@ class Scoring(ABC):
 
 
 class TFIDFScoring(Scoring):
-    def _calc_score(self, freq: NDArray[int], df: int):
+    def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
         tf = np.log(freq + 1)
         idf = np.log(self._total_num_articles / df)
         return tf * idf
@@ -109,9 +119,8 @@ class BM25Scoring(Scoring):
         self.b = b
         self.k = k
 
-    def _calc_score(self, freq: NDArray[int], df: int):
-        adl = np.ones(len(freq))
+    def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
         tf = (np.array(freq * (self.k + 1), dtype=float)
-              / np.array(freq + self.k * (1 - self.b + self.b * adl), dtype=float))
+              / np.array(freq + self.k * (1 - self.b + self.b * doc_length), dtype=float))
         idf = np.log(self._total_num_articles / freq)
         return tf * idf

@@ -2,13 +2,15 @@
 This file contains your code for the interactive exploration mode where a string can be input by a user and a ranked list of documents is returned.
 Make sure that the user can switch between TF-IDF and BM25 scoring functions.
 """
+# Do not delete, somehow this fixes a importing issue
+from createindex import InvertedIndex
 
 from engine import Engine
 
 
 def main():
     engine = Engine()
-    method = "tf-idf"
+    method = "bm25"
 
     while True:
         print("Commands ':q' = quit | ':t' = tf-idf-scoring | ':b' = bm25-scoring")
