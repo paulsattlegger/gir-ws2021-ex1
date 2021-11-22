@@ -1,26 +1,27 @@
-from abc import ABC
 from collections import Counter
-from createindex import InvertedIndex, text2tokens
-from typing import Dict
-from scoring import TFIDFScoring, BM25Scoring
 from pathlib import Path
+from typing import Dict
+
+from createindex import InvertedIndex, text2tokens, Article
+from scoring import TFIDFScoring, BM25Scoring
 
 
-class Engine(ABC):
+# TODO: this class isn't (yet ?) needed; remove if it doesn't extend index somehow
+class Engine:
     def __init__(self,
                  index_file_path="../index.obj",
                  articles_path="../dataset/wikipedia articles",
                  force_reindexing=False):
-        self.index_path = index_file_path
+        self._index_path = index_file_path
         index_file = Path(index_file_path)
         if not index_file.is_file() or force_reindexing:
-            self.index = InvertedIndex()
-            self.index.populate(articles_path)
-            self.index.dump(index_file_path)
+            self._index = InvertedIndex()
+            self._index.populate(articles_path)
+            self._index.dump(index_file_path)
         else:
-            self.index = InvertedIndex.load(index_file_path)
-        self.article_count: int = self.index.article_count
-        self.avg_article_len: float = self.index.avg_article_len
+            self._index = InvertedIndex.load(index_file_path)
+        self.article_count: int = self._index.article_count
+        self.avg_article_len: float = self._index.avg_article_len
 
     @staticmethod
     def _create_query_dict(query: str):
@@ -28,7 +29,7 @@ class Engine(ABC):
         return Counter(tokens)
 
     def _retrieve_docs(self, query_dict: Dict[str, int]):
-        results = [list(self.index.search(word)) for word in query_dict]
+        results = [list(self._index.search(word)) for word in query_dict]
         dfs = list(map(lambda x: 0 if x is None else len(x), results))
 
         return results, dfs
@@ -46,15 +47,5 @@ class Engine(ABC):
         ranked = scoring.rank_articles(query_dict, results, dfs)
         return ranked
 
-    def search_and_print(self, query: str, scoring_method="bm25", num_results=3):
-        ranked = self.search(query, scoring_method)
-        article_keys = [int(ranked[i].key) for i in range(min(len(ranked), num_results))]
-        articles = list(self.index.fetch(*article_keys))
-
-        for i, article in enumerate(articles):
-            print(f"Result number: {i + 1}")
-            print(f"Article id: {article.title_id} | Score: {ranked[i].score}")
-            print("-"*100)
-            print(article.bdy)
-            print("-"*100)
-            print("\n\n")
+    def fetch(self, article_title_id: int) -> Article:
+        return self._index.fetch(article_title_id)

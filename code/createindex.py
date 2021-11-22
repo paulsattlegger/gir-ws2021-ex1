@@ -122,11 +122,11 @@ class InvertedIndex:
         print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
 
-    def fetch(self, *article_title_ids: int) -> Generator[Article, None, None]:
-        for document in {self._articles[article_title_id][0] for article_title_id in article_title_ids}:
-            for article in get_articles(document):
-                if article.title_id in article_title_ids:
-                    yield article
+    def fetch(self, article_title_id: int) -> Article:
+        document, _ = self._articles[article_title_id]
+        for article in get_articles(document):
+            if article.title_id == article_title_id:
+                return article
 
     def search(self, term: str) -> Generator[Posting, None, None]:
         for article_title_id, tf in self._tokens.get(term):

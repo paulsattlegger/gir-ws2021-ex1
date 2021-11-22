@@ -1,16 +1,14 @@
-from abc import ABC, abstractmethod
-from collections import namedtuple
+from abc import abstractmethod
 from typing import Dict, List
+
 import numpy as np
 from numpy.typing import NDArray
 
 from createindex import Posting
 
-ArticleWithScore = namedtuple("ArticleWithScore", "key score")
 
-
-class Scoring(ABC):
-    def __init__(self, total_num_articles: int, avg_doc_length: float, method="cosine"):
+class Scoring:
+    def __init__(self, total_num_articles: int, avg_doc_length: float, method: str = "cosine"):
         """
         Abstract class for scoring methods
         :param total_num_articles: total number of articles in database
@@ -62,24 +60,24 @@ class Scoring(ABC):
         return scored_docs
 
     def _rank(self, articles: Dict[int, NDArray[float]], query_vector: NDArray[float]):
-        ranked_articles: List[ArticleWithScore] = []
+        scores: Dict[int, float] = {}
         norm_q_vec = np.linalg.norm(query_vector)
 
-        for article_key in articles:
+        for article_title_id in articles:
             if self._method == "cosine":
-                norm_a_vec = np.linalg.norm(articles[article_key])
+                norm_a_vec = np.linalg.norm(articles[article_title_id])
                 score = np.dot(norm_a_vec, norm_q_vec)
             else:
-                score = np.sum(articles[article_key])
-            ranked_articles.append(ArticleWithScore(article_key, score))
+                score = np.sum(articles[article_title_id])
+            scores[article_title_id] = float(score)
 
-        ranked_articles.sort(key=lambda a: a.score, reverse=True)
-        return ranked_articles
+        # https://stackoverflow.com/a/61793402
+        return dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))
 
     def rank_articles(self,
                       query_dict: Dict[str, int],
                       articles: List[List[Posting]],
-                      dfs: List[int]) -> List[ArticleWithScore]:
+                      dfs: List[int]) -> Dict[int, float]:
         """
         Ranks all articles by importance
         :param query_dict: All occurred search terms and their frequency in the query
@@ -103,6 +101,7 @@ class TFIDFScoring(Scoring):
 class BM25Scoring(Scoring):
     def __init__(self,
                  total_num_articles: int,
+                 avg_doc_length: float,
                  method="cosine",
                  b: float = 0.75,
                  k: float = 1.25):
@@ -115,7 +114,7 @@ class BM25Scoring(Scoring):
         :param b: controls document length normalization
         :param k: controls term frequency scaling
         """
-        super().__init__(total_num_articles, method)
+        super().__init__(total_num_articles, avg_doc_length, method)
         self.b = b
         self.k = k
 

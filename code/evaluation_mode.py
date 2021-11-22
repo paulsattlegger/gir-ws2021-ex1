@@ -5,6 +5,7 @@ from collections import namedtuple
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import List, Optional
+
 from engine import Engine
 
 # TODO: aim scoring TF-IDF 0.20 %, BM25 0.22-0.23 %
