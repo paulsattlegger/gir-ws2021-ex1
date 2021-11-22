@@ -62,7 +62,7 @@ class ArticlesParser(HTMLParser):
 
     def handle_data(self, data):
         if self._current_tag in ['title', 'bdy', 'id']:
-            self._current_data += data
+            self._current_data.append(data)
 
 
 class InvertedIndex:
