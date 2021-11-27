@@ -1,10 +1,11 @@
 """
 This file contains your code to generate the evaluation files that are input to the trec_eval algorithm.
 """
+from createindex import InvertedIndex
 from collections import namedtuple
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from engine import Engine
 
@@ -52,7 +53,19 @@ def parse_topics_file(path: str):
     return parser.topics
 
 
+def compose_q_rel(results: Dict[str, Dict[int, float]], file: str):
+    qrel = open(file, "w")
+    name = "Test"
+    for result in results.items():
+        topic_id = result[0]
+        postings = result[1]
+        for i, posting_id in enumerate(postings):
+            qrel.write(f"{topic_id} Q0 {posting_id} {i + 1} {postings[posting_id]} {name}\n")
+    qrel.close()
+
+
 def main():
+    qrel_file = "../qrel.txt"
     topics = parse_topics_file('../dataset/topics.xml')
     print(topics)
 
@@ -61,10 +74,15 @@ def main():
     results = {}
 
     for topic in topics:
+        print(f"searching for: {topic.query_string}")
         result = engine.search(topic.query_string)
-        results[topic.query_id] = result[0:100]
-
-    # TODO: write results to file using the given format
+        temp_res = {}
+        for key in list(result)[0:100]:
+            temp_res[key] = result[key]
+        results[topic.query_id] = temp_res
+    print("Saving Q-Rel file...")
+    compose_q_rel(results, qrel_file)
+    print("done.")
     # TODO: use trec_eval to evaluate
 
 
