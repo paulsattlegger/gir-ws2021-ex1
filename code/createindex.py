@@ -36,6 +36,34 @@ Article = namedtuple("Article", ["title", "title_id", "bdy"])
 Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
 
 
+class NpList:
+    def __init__(self, dtype=np.uint32):
+        self.size = 0
+        self._allocated = 2
+        self._array = np.zeros((1, self._allocated), dtype=dtype)
+
+    @property
+    def array(self):
+        self._allocated = self.size
+        self._array.resize((1, self.size))
+        return self._array
+
+    def append(self, element):
+        # https://en.wikipedia.org/wiki/Dynamic_array#Geometric_expansion_and_amortized_cost
+        if self.size == self._allocated:
+            self._allocated *= 2
+            # this happens in-place
+            self._array.resize((1, self._allocated))
+        self._array[0, self.size] = element
+        self.size += 1
+
+    def __iter__(self, *args, **kwargs):
+        return self._array[0, :self.size].__iter__(*args, **kwargs)
+
+    def __getitem__(self, *args, **kwargs):
+        return self._array[0, :self.size].__getitem__(*args, **kwargs)
+
+
 class ArticlesParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -69,15 +97,17 @@ class InvertedIndex:
     def __init__(self):
         self.article_count: int = 0
         self._total_article_len: int = 0
-        self._tokens: Dict[str, Union[list, np.array]] = defaultdict(list)
-        self._articles: Dict[int, tuple] = {}
+        self._tokens: Dict[str, Union[NpList, np.array]] = defaultdict(NpList)
+        self._articles: Dict[int, Union[NpList, np.array]] = defaultdict(NpList)
+        self._path: Optional[Path] = None
 
     @cached_property
     def avg_article_len(self):
         return self._total_article_len / self.article_count
 
     def populate(self, path: str, articles_total: int = 281782):
-        documents = Path(path).iterdir()
+        self._path = Path(path)
+        documents = self._path.iterdir()
         # TODO: remove in final version
         documents = islice(documents, 25)
         # __benchmark__ {
@@ -88,17 +118,18 @@ class InvertedIndex:
             for future in as_completed(futures):
                 tokens_for_document = future.result()
                 for article_title_id, tokens in tokens_for_document.items():
-                    for token, cnt in tokens.items():
+                    for token, tf in tokens.items():
                         self._tokens[token].append(article_title_id)
-                        self._tokens[token].append(cnt)
+                        self._tokens[token].append(tf)
                     self.article_count += 1
                     document = futures[future]
-                    # TODO: tokens.total() (requires Python 3.10)
                     # maybe len(article.bdy) instead of tokens count
-                    article_len = sum(tokens.values())
-                    self._articles[article_title_id] = document, article_len
-                    self._total_article_len += tokens.total()
-                del document
+                    article_len = tokens.total()
+                    self._articles[article_title_id].append(document.stem)
+                    self._articles[article_title_id].append(article_len)
+                    self._total_article_len += article_len
+                # frees processed futures from memory (important!)
+                del futures[future]
                 # __benchmark__ {
                 articles_per_second = self.article_count / (perf_counter() - start)
                 seconds_remaining = (articles_total - self.article_count) / articles_per_second
@@ -115,21 +146,24 @@ class InvertedIndex:
         start = perf_counter()
         # __benchmark__ }
         for token in self._tokens:
-            self._tokens[token] = np.array(self._tokens[token], dtype=np.uint32)
+            self._tokens[token] = self._tokens[token].array
             self._tokens[token] = np.reshape(self._tokens[token], newshape=(-1, 2))
-            self._tokens[token] = self._tokens[token][self._tokens[token][:, 0].argsort()]
+        for article_title_id in self._articles:
+            self._articles[article_title_id] = self._articles[article_title_id].array
+            self._articles[article_title_id] = np.reshape(self._articles[article_title_id], 2)
         # __benchmark__ {
         print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
 
     def fetch(self, article_title_id: int) -> Article:
-        document, _ = self._articles[article_title_id]
+        document_stem, _ = self._articles[article_title_id]
+        document = Path(self._path, f'{document_stem}.xml')
         for article in get_articles(document):
             if article.title_id == article_title_id:
                 return article
 
     def search(self, term: str) -> Generator[Posting, None, None]:
-        for article_title_id, tf in self._tokens.get(term):
+        for article_title_id, tf in self._tokens[term]:
             _, article_len = self._articles[article_title_id]
             yield Posting(article_title_id, article_len, tf)
 
@@ -297,4 +331,11 @@ def main():
 
 
 if __name__ == "__main__":
+    # __benchmark__ {
+    # tracemalloc.start()
+    # __benchmark__ }
     main()
+    # __benchmark__ {
+    # _, peak = tracemalloc.get_traced_memory()
+    # print(f'Peak size of allocated memory: {peak}')
+    # __benchmark__ }

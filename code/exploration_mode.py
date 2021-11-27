@@ -6,7 +6,7 @@ from datetime import timedelta
 from time import perf_counter
 from shutil import get_terminal_size
 
-from createindex import InvertedIndex
+from createindex import InvertedIndex, NpList
 from engine import Engine
 
 
