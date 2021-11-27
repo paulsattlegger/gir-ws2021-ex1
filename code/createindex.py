@@ -1,20 +1,20 @@
 """
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
 """
+import array
 import pickle
 import re
 import unittest
 from collections import namedtuple, Counter, defaultdict
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
-from functools import cached_property
+from functools import cached_property, partial
 from html.parser import HTMLParser
-from itertools import islice
+from itertools import islice, zip_longest
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, Optional, Union
+from typing import Generator, Dict, Optional
 
-import numpy as np
 from nltk.corpus import stopwords  # Allowed stopwords list
 from nltk.stem import *  # Allowed stemming library
 
@@ -34,34 +34,7 @@ stop_words = stopwords.words('english')
 
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
 Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
-
-
-class NpList:
-    def __init__(self, dtype=np.uint32):
-        self.size = 0
-        self._allocated = 2
-        self._array = np.zeros((1, self._allocated), dtype=dtype)
-
-    @property
-    def array(self):
-        self._allocated = self.size
-        self._array.resize((1, self.size))
-        return self._array
-
-    def append(self, element):
-        # https://en.wikipedia.org/wiki/Dynamic_array#Geometric_expansion_and_amortized_cost
-        if self.size == self._allocated:
-            self._allocated *= 2
-            # this happens in-place
-            self._array.resize((1, self._allocated))
-        self._array[0, self.size] = element
-        self.size += 1
-
-    def __iter__(self, *args, **kwargs):
-        return self._array[0, :self.size].__iter__(*args, **kwargs)
-
-    def __getitem__(self, *args, **kwargs):
-        return self._array[0, :self.size].__getitem__(*args, **kwargs)
+I_array = partial(array.array, 'I')
 
 
 class ArticlesParser(HTMLParser):
@@ -97,8 +70,10 @@ class InvertedIndex:
     def __init__(self):
         self.article_count: int = 0
         self._total_article_len: int = 0
-        self._tokens: Dict[str, Union[NpList, np.array]] = defaultdict(NpList)
-        self._articles: Dict[int, Union[NpList, np.array]] = defaultdict(NpList)
+        # Note: We use array.array instead of np.array, because array is over-allocated and thus allows efficient
+        # .append(). (https://github.com/python/cpython/blob/main/Modules/arraymodule.c#L153)
+        self._tokens: Dict[str, array.array] = defaultdict(I_array)
+        self._articles: Dict[int, array.array] = defaultdict(I_array)
         self._path: Optional[Path] = None
 
     @cached_property
@@ -125,7 +100,7 @@ class InvertedIndex:
                     document = futures[future]
                     # maybe len(article.bdy) instead of tokens count
                     article_len = tokens.total()
-                    self._articles[article_title_id].append(document.stem)
+                    self._articles[article_title_id].append(int(document.stem))
                     self._articles[article_title_id].append(article_len)
                     self._total_article_len += article_len
                 # frees processed futures from memory (important!)
@@ -139,21 +114,6 @@ class InvertedIndex:
         # __benchmark__ {
         print(f'\nTotal indexing time: {timedelta(seconds=perf_counter() - start)}')
         # __benchmark__ }
-        self._optimise()
-
-    def _optimise(self):
-        # __benchmark__ {
-        start = perf_counter()
-        # __benchmark__ }
-        for token in self._tokens:
-            self._tokens[token] = self._tokens[token].array
-            self._tokens[token] = np.reshape(self._tokens[token], newshape=(-1, 2))
-        for article_title_id in self._articles:
-            self._articles[article_title_id] = self._articles[article_title_id].array
-            self._articles[article_title_id] = np.reshape(self._articles[article_title_id], 2)
-        # __benchmark__ {
-        print(f'Total index optimisation time: {timedelta(seconds=perf_counter() - start)}')
-        # __benchmark__ }
 
     def fetch(self, article_title_id: int) -> Article:
         document_stem, _ = self._articles[article_title_id]
@@ -163,7 +123,7 @@ class InvertedIndex:
                 return article
 
     def search(self, term: str) -> Generator[Posting, None, None]:
-        for article_title_id, tf in self._tokens[term]:
+        for article_title_id, tf in grouper(self._tokens[term], 2):
             _, article_len = self._articles[article_title_id]
             yield Posting(article_title_id, article_len, tf)
 
@@ -287,6 +247,16 @@ def get_tokens_for_document(document: Path) -> Dict[int, Counter]:
     for article in get_articles(document):
         d[article.title_id] = Counter(text2tokens(article.bdy))
     return d
+
+
+def grouper(iterable, n, fill_value=None):
+    """
+    Collect data into non-overlapping fixed-length chunks or blocks
+    """
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
+    # (https://docs.python.org/3/library/itertools.html#itertools-recipes)
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fill_value)
 
 
 class TestTextPreProcessing(unittest.TestCase):
