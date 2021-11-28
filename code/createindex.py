@@ -1,5 +1,6 @@
 """
-This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization function (text2tokens), there are no restrictions in how you organize this file.
+This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization
+function (text2tokens), there are no restrictions in how you organize this file.
 """
 import array
 import pickle
@@ -10,7 +11,7 @@ from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from functools import cached_property, partial
 from html.parser import HTMLParser
-from itertools import islice, zip_longest
+from itertools import zip_longest
 from pathlib import Path
 from time import perf_counter
 from typing import Generator, Dict, Optional
@@ -27,7 +28,7 @@ HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u
 # 'Punctuation, Connector'
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
-# TODO maybe ignore stopwords to improve performance
+# TODO: maybe ignore stopwords to improve performance
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
 stemmer_cache = {}
 stop_words = stopwords.words('english')
@@ -83,8 +84,6 @@ class InvertedIndex:
     def populate(self, path: str, articles_total: int = 281782):
         self._path = Path(path)
         documents = self._path.iterdir()
-        # TODO: remove in final version
-        documents = islice(documents, 25)
         # __benchmark__ {
         start = perf_counter()
         # __benchmark__ }
@@ -148,12 +147,6 @@ def text2tokens(text):
     :param text: a text string
     :return: a tokenized string with preprocessing (e.g. stemming, stopword removal, ...) applied
     """
-    # TODO: tokenization
-    # TODO: lowercasing
-    # TODO: stemming (library allowed, english only, e. g. NLTK)
-    # TODO: remove stop words
-    # TODO: handle special characters, multi-blanks, punctuation
-    # TODO: test preprocessing (here points are given)!
 
     tokens = tokenize(text)
     tokens = lowercase(tokens)
@@ -301,11 +294,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # __benchmark__ {
-    # tracemalloc.start()
-    # __benchmark__ }
     main()
-    # __benchmark__ {
-    # _, peak = tracemalloc.get_traced_memory()
-    # print(f'Peak size of allocated memory: {peak}')
-    # __benchmark__ }
