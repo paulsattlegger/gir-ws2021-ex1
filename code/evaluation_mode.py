@@ -1,12 +1,13 @@
 """
 This file contains your code to generate the evaluation files that are input to the trec_eval algorithm.
 """
-from createindex import InvertedIndex
 from collections import namedtuple
 from html.parser import HTMLParser
+from itertools import islice
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Optional
 
+from createindex import InvertedIndex
 from engine import Engine
 
 # TODO: aim scoring TF-IDF 0.20 %, BM25 0.22-0.23 %
@@ -19,15 +20,15 @@ Topic = namedtuple("Topic", ["query_id", "query_string"])
 class TopicsParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.topics: List[Topic] = []
+        self.topics: list[Topic] = []
         self._query_id: Optional[str] = None
         self._query_string: Optional[str] = None
-        self._previous_tag, self._current_tag = None, None
-        self._previous_data, self._current_data = None, None
+        self._tag = None
+        self._data = []
 
     def handle_starttag(self, tag, attrs):
-        self._previous_tag, self._current_tag = self._current_tag, tag
-        self._previous_data, self._current_data = self._current_data, []
+        self._tag = tag
+        self._data = []
         if tag == 'topic':
             for name, value in attrs:
                 if name == 'id':
@@ -35,13 +36,13 @@ class TopicsParser(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == 'title':
-            self._query_string = ''.join(self._current_data)
+            self._query_string = ''.join(self._data)
         elif tag == 'topic':
             self.topics.append(Topic(self._query_id, self._query_string))
 
     def handle_data(self, data):
-        if self._current_tag in ['title', 'bdy', 'id']:
-            self._current_data.append(data)
+        if self._tag == 'title':
+            self._data.append(data)
 
 
 def parse_topics_file(path: str):
@@ -53,35 +54,30 @@ def parse_topics_file(path: str):
     return parser.topics
 
 
-def compose_q_rel(results: Dict[str, Dict[int, float]], file: str):
-    qrel = open(file, "w")
-    name = "Test"
-    for result in results.items():
-        topic_id = result[0]
-        postings = result[1]
-        for i, posting_id in enumerate(postings):
-            qrel.write(f"{topic_id} Q0 {posting_id} {i + 1} {postings[posting_id]} {name}\n")
-    qrel.close()
+def compose_q_rel(results: dict[str, dict[int, float]], path: str):
+    run_name = "Test"
+    with Path(path).open("w") as file:
+        for topic_id, postings in results.items():
+            for i, posting_id in enumerate(postings):
+                file.write(f"{topic_id} Q0 {posting_id} {i + 1} {postings[posting_id]} {run_name}\n")
 
 
 def main():
-    qrel_file = "../qrel.txt"
     topics = parse_topics_file('../dataset/topics.xml')
-    print(topics)
-
     # TODO: change force_reindexing to True as specified in the assignment
     engine = Engine(force_reindexing=False)
+    scoring_method = "tf-idf"
     results = {}
 
     for topic in topics:
         print(f"searching for: {topic.query_string}")
-        result = engine.search(topic.query_string)
+        result = engine.search(topic.query_string, scoring_method=scoring_method)
         temp_res = {}
-        for key in list(result)[0:100]:
+        for key in islice(result, 100):
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, qrel_file)
+    compose_q_rel(results, f'{scoring_method}.txt')
     print("done.")
     # TODO: use trec_eval to evaluate
 

@@ -14,7 +14,7 @@ from html.parser import HTMLParser
 from itertools import zip_longest
 from pathlib import Path
 from time import perf_counter
-from typing import Generator, Dict, Optional
+from typing import Generator, Optional
 
 from nltk.corpus import stopwords  # Allowed stopwords list
 from nltk.stem import *  # Allowed stemming library
@@ -73,8 +73,8 @@ class InvertedIndex:
         self._total_article_len: int = 0
         # Note: We use array.array instead of np.array, because array is over-allocated and thus allows efficient
         # .append(). (https://github.com/python/cpython/blob/main/Modules/arraymodule.c#L153)
-        self._tokens: Dict[str, array.array] = defaultdict(I_array)
-        self._articles: Dict[int, array.array] = defaultdict(I_array)
+        self._tokens: dict[str, array.array] = defaultdict(I_array)
+        self._articles: dict[int, array.array] = defaultdict(I_array)
         self._path: Optional[Path] = None
 
     @cached_property
@@ -235,7 +235,7 @@ def get_articles(document: Path) -> Generator[Article, None, None]:
         parser.articles.clear()
 
 
-def get_tokens_for_document(document: Path) -> Dict[int, Counter]:
+def get_tokens_for_document(document: Path) -> dict[int, Counter]:
     d = {}
     for article in get_articles(document):
         d[article.title_id] = Counter(text2tokens(article.bdy))

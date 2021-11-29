@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Dict, List
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,7 +21,7 @@ class Scoring:
         self._avg_doc_length = avg_doc_length
         self._method = method
 
-    def _calc_query_vector(self, query: Dict[str, int], query_dict: dict, dfs: List[int]):
+    def _calc_query_vector(self, query: dict[str, int], query_dict: dict, dfs: list[int]):
         dfs_np = np.array(dfs)
         query_vector = np.zeros(len(query_dict), dtype=float)
         idfs = np.where(dfs_np > 0, np.log(self._total_num_articles / dfs_np), 0)
@@ -40,8 +39,8 @@ class Scoring:
         """
         pass
 
-    def _calc_score_for_all_articles(self, results: List[List[Posting]]):
-        scored_docs: Dict[int, NDArray[float]] = {}
+    def _calc_score_for_all_articles(self, results: list[list[Posting]]):
+        scored_docs: dict[int, NDArray[float]] = {}
         for i, found_docs_by_word in enumerate(results):
             if found_docs_by_word is None or len(found_docs_by_word) == 0:
                 continue
@@ -59,8 +58,8 @@ class Scoring:
                     scored_docs[doc[0]][i] = score[k]
         return scored_docs
 
-    def _rank(self, articles: Dict[int, NDArray[float]], query_vector: NDArray[float]):
-        scores: Dict[int, float] = {}
+    def _rank(self, articles: dict[int, NDArray[float]], query_vector: NDArray[float]):
+        scores: dict[int, float] = {}
         norm_q_vec = np.linalg.norm(query_vector)
 
         for article_title_id in articles:
@@ -75,9 +74,9 @@ class Scoring:
         return dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))
 
     def rank_articles(self,
-                      query_dict: Dict[str, int],
-                      articles: List[List[Posting]],
-                      dfs: List[int]) -> Dict[int, float]:
+                      query_dict: dict[str, int],
+                      articles: list[list[Posting]],
+                      dfs: list[int]) -> dict[int, float]:
         """
         Ranks all articles by importance
         :param query_dict: All occurred search terms and their frequency in the query
