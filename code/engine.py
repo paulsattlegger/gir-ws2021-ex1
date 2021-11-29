@@ -34,15 +34,15 @@ class Engine:
 
         return results, dfs
 
-    def search(self, query: str, scoring_method="bm25"):
+    def search(self, query: str, scoring_method="bm25", ranking_method="cosine"):
         assert scoring_method in ('tf-idf', 'bm25'), f'Invalid method "{scoring_method}"'
         query_dict = self._create_query_dict(query)
         results, dfs = self._retrieve_docs(query_dict)
 
         if scoring_method == "tf-idf":
-            scoring = TFIDFScoring(self.article_count, self.avg_article_len)
+            scoring = TFIDFScoring(self.article_count, self.avg_article_len, method=ranking_method)
         else:
-            scoring = BM25Scoring(self.article_count, self.avg_article_len)
+            scoring = BM25Scoring(self.article_count, self.avg_article_len, method=ranking_method)
 
         ranked = scoring.rank_articles(query_dict, results, dfs)
         return ranked

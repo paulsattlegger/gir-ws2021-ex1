@@ -67,17 +67,18 @@ def main():
     # TODO: change force_reindexing to True as specified in the assignment
     engine = Engine(force_reindexing=False)
     scoring_method = "tf-idf"
+    ranking_method = "sum"
     results = {}
 
     for topic in topics:
         print(f"searching for: {topic.query_string}")
-        result = engine.search(topic.query_string, scoring_method=scoring_method)
+        result = engine.search(topic.query_string, scoring_method=scoring_method, ranking_method=ranking_method)
         temp_res = {}
         for key in islice(result, 100):
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'../{scoring_method}.txt')
+    compose_q_rel(results, f'../{scoring_method}_{ranking_method}.txt')
     print("done.")
     # TODO: use trec_eval to evaluate
 
