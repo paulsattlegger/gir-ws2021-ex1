@@ -11,7 +11,7 @@ from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from functools import cached_property, partial
 from html.parser import HTMLParser
-from itertools import zip_longest
+from itertools import zip_longest, islice
 from pathlib import Path
 from time import perf_counter
 from typing import Generator, Optional
@@ -84,6 +84,8 @@ class InvertedIndex:
     def populate(self, path: str, articles_total: int = 281782):
         self._path = Path(path)
         documents = self._path.iterdir()
+        # TODO: remove in final version
+        documents = islice(documents, 25)
         # __benchmark__ {
         start = perf_counter()
         # __benchmark__ }
@@ -239,6 +241,7 @@ def get_tokens_for_document(document: Path) -> dict[int, Counter]:
     d = {}
     for article in get_articles(document):
         d[article.title_id] = Counter(text2tokens(article.bdy))
+        d[article.title_id].update(text2tokens(article.title))
     return d
 
 

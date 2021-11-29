@@ -77,7 +77,7 @@ def main():
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'{scoring_method}.txt')
+    compose_q_rel(results, f'../{scoring_method}.txt')
     print("done.")
     # TODO: use trec_eval to evaluate
 
