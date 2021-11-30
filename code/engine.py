@@ -34,7 +34,7 @@ class Engine:
 
         return results, dfs
 
-    def search(self, query: str, scoring_method="bm25", ranking_method="cosine"):
+    def search(self, query: str, scoring_method="bm25", ranking_method="sum"):
         assert scoring_method in ('tf-idf', 'bm25'), f'Invalid method "{scoring_method}"'
         query_dict = self._create_query_dict(query)
         results, dfs = self._retrieve_docs(query_dict)

@@ -66,7 +66,7 @@ def main():
     topics = parse_topics_file('../dataset/topics.xml')
     # TODO: change force_reindexing to True as specified in the assignment
     engine = Engine(force_reindexing=False)
-    scoring_method = "tf-idf"
+    scoring_method = "bm25"
     ranking_method = "sum"
     results = {}
 

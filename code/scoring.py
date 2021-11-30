@@ -101,7 +101,7 @@ class BM25Scoring(Scoring):
     def __init__(self,
                  total_num_articles: int,
                  avg_doc_length: float,
-                 method="cosine",
+                 method="sum",
                  b: float = 0.75,
                  k: float = 1.25):
         """
@@ -118,7 +118,11 @@ class BM25Scoring(Scoring):
         self.k = k
 
     def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
-        tf = (np.array(freq * (self.k + 1), dtype=float)
-              / np.array(freq + self.k * (1 - self.b + self.b * doc_length), dtype=float))
-        idf = np.log(self._total_num_articles / freq)
+        """
+        Formula from: https://en.wikipedia.org/wiki/Okapi_BM25
+        """
+        numerator = np.array(freq * (self.k + 1), dtype=float)
+        denominator = np.array(freq + self.k * (1 - self.b + self.b * doc_length), dtype=float)
+        tf = numerator / denominator
+        idf = np.log((self._total_num_articles - df + 0.5)/(df + 0.5) + 1)
         return tf * idf
