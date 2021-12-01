@@ -9,7 +9,7 @@ import unittest
 from collections import namedtuple, Counter, defaultdict
 from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
-from functools import cached_property, partial
+from functools import cached_property, partial, lru_cache
 from html.parser import HTMLParser
 from itertools import zip_longest, islice
 from pathlib import Path
@@ -205,8 +205,6 @@ def lowercase(tokens):
     for token in tokens:
         yield token.lower()
 
-
-# TODO: functools @cached?
 def stem(tokens):
     """
     This method uses the NLTK Porter stemmer
@@ -214,12 +212,11 @@ def stem(tokens):
     :return: The stemmed string
     """
     for token in tokens:
-        if token in stemmer_cache:
-            yield stemmer_cache[token]
-        else:
-            stemmed_token = stemmer.stem(token)
-            stemmer_cache[token] = stemmed_token
-            yield stemmed_token
+        yield lookup_stem(token)
+
+@lru_cache(maxsize=150000)
+def lookup_stem(token):
+    return stemmer.stem(token)
 
 
 def remove_stop_words(tokens):
