@@ -19,19 +19,23 @@ from typing import Generator, Optional
 from nltk.corpus import stopwords  # Allowed stopwords list
 from nltk.stem import *  # Allowed stemming library
 
-APOSTROPHES_REGEX = r'[\u0022\u0027\u0060\u00AB\u00B4\u00BB\u2018\u2019\u201B\u201C\u201D\u201E\u201F\u2039\u203A' \
-                    r'\u275B\u275C\u275D\u275E\u275F\u276E\u276F]'  # Unicode apostrophes
+APOSTROPHES_REGEX = r'[\u0060\u00B4\2018\u2019\u0027\u2032\u02BB]'  # Unicode apostrophes
+
 # HYPHEN_REGEX = r'(?<=\d)[-–—―](?<=\d)'
 HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40' \
                r'\u2E5D\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D\u10EAD' \
                r'\u005F\u203F\u2040\u2054\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]'  # Unicode 'Punctuation, Dash' and
+# TODO: remove
+# QUOTATION_REGEX = r'\u0022\u00AB\u00BB\u2018\u201A\u201C\u201D\u201E\u2039\u203A'  # Unicode quotations
+
 # 'Punctuation, Connector'
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
 # TODO: maybe ignore stopwords to improve performance
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
+#stemmer = PorterStemmer()
 stemmer_cache = {}
-stop_words = stopwords.words('english')
+stop_words = stopwords.words('english')  # TODO: make set
 
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
 Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
@@ -272,19 +276,33 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(list(remove_punctuation(input_text)), expected_text)
 
     def test_stemming(self):
-        input_text = ['caresses', 'flies', 'flies', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned',
+        input_text = ['davis', 'caresses', 'flies', 'flies', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned',
                       'humbled', 'sized',
                       'meeting', 'stating', 'siezing', 'itemization', 'sensational', 'traditional', 'reference',
                       'colonizer', 'plotted']
-        expected_text = ['caress', 'fli', 'fli', 'fli', 'die', 'mule', 'deni', 'die', 'agre', 'own', 'humbl', 'size',
+        expected_text = ['davi', 'caress', 'fli', 'fli', 'fli', 'die', 'mule', 'deni', 'die', 'agre', 'own', 'humbl', 'size',
                          'meet', 'state', 'siez', 'item', 'sensat', 'tradit', 'refer', 'colon', 'plot']
         self.assertEqual(list(stem(input_text)), expected_text)
 
     def test_remove_stop_words(self):
-        input_text = ['i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope', "you're", "you've",
+        input_text = ['this', 'is', 'a', 'i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope', "you're", "you've",
                       'stillhere']
         expected_text = ['notremoved', 'stays', 'nope', 'stillhere']
         self.assertEqual(list(remove_stop_words(input_text)), expected_text)
+
+    def test_text2tokens(self):
+        input_text = 'This      "is" a. e@xample "Sentence"   "related words"    2   .te.s.t. 12345 .our. P.reprOceSSing'
+        expected_text = ['exampl', 'sentenc', 'relat', 'word', '2', 'test', '12345', 'preprocess']
+        self.assertEqual(text2tokens(input_text), expected_text)
+        self.assertEqual(text2tokens('mother\'s day'), ['mother', 'day'])
+        self.assertEqual(text2tokens('Computer "Operating Systems"'), ['comput', 'oper', 'system'])
+        self.assertEqual(text2tokens('"tai chi" styles forms'), ['tai', 'chi', 'style', 'form'])
+        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'), ['appl', 'inc', 'product', 'invent', 'steve',  'job'])
+        self.assertEqual(text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'), ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
+        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'), ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
+
+
+
 
 
 def main():
