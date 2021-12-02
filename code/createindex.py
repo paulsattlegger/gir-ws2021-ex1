@@ -291,7 +291,7 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(list(remove_stop_words(input_text)), expected_text)
 
     def test_text2tokens(self):
-        input_text = 'This      "is" a. e@xample "Sentence"   "related words"    2   .te.s.t. 12345 .our. P.reprOceSSing'
+        input_text = 'This     "is" a. e@xample "Sentence"   "related words"    2   .te.s.t. 12345 .our. P.reprOceSSing'
         expected_text = ['exampl', 'sentenc', 'relat', 'word', '2', 'test', '12345', 'preprocess']
         self.assertEqual(text2tokens(input_text), expected_text)
         self.assertEqual(text2tokens('mother\'s day'), ['mother', 'day'])

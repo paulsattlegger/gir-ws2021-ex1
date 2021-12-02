@@ -85,7 +85,7 @@ def main():
     print("done.")
 
 
-if __name__ == "__main__":
+def parse_args():
     parser = ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-b', '--bm25', action='store_true', help='use BM25 scoring')
@@ -93,6 +93,9 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--cosine', action='store_true',
                         help='use cosine similarity to compare documents to queries, '
                              'normally the sum of all scores is used')
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+if __name__ == "__main__":
+    args = parse_args()
     main()
