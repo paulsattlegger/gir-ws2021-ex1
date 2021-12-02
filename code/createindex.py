@@ -297,9 +297,13 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(text2tokens('mother\'s day'), ['mother', 'day'])
         self.assertEqual(text2tokens('Computer "Operating Systems"'), ['comput', 'oper', 'system'])
         self.assertEqual(text2tokens('"tai chi" styles forms'), ['tai', 'chi', 'style', 'form'])
-        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'), ['appl', 'inc', 'product', 'invent', 'steve',  'job'])
-        self.assertEqual(text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'), ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
-        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'), ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
+        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'),
+                         ['appl', 'inc', 'product', 'invent', 'steve', 'job'])
+        self.assertEqual(
+            text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'),
+            ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
+        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'),
+                         ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
 
 
 def main():
