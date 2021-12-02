@@ -33,7 +33,7 @@ HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
-stop_words = stopwords.words('english')
+stop_words = set(stopwords.words('english'))  # set allows O(1) lookup, list is O(n)
 
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
 Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
