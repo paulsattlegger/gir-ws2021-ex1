@@ -1,6 +1,7 @@
 """
 This file contains your code to generate the evaluation files that are input to the trec_eval algorithm.
 """
+from argparse import ArgumentParser
 from collections import namedtuple
 from html.parser import HTMLParser
 from itertools import islice
@@ -8,11 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 from createindex import InvertedIndex
-from engine import Engine
-
-# TODO: aim scoring TF-IDF 0.20 %, BM25 0.22-0.23 %
-# TODO: parse topic file and get query id for relevant documents
-# TODO: use trec_eval
+from exploration_mode import search
+from scoring import BM25Scoring, TFIDFScoring
 
 Topic = namedtuple("Topic", ["query_id", "query_string"])
 
@@ -63,25 +61,36 @@ def compose_q_rel(results: dict[str, dict[int, float]], path: str):
 
 
 def main():
+    index = InvertedIndex.load('../index.obj')
     topics = parse_topics_file('../dataset/topics.xml')
-    # TODO: change force_reindexing to True as specified in the assignment
-    engine = Engine(force_reindexing=False)
-    scoring_method = "bm25"  # 'tf-idf' or 'bm25'
-    ranking_method = "sum"
+
+    method = "cosine" if args.cosine else "sum"
+    if args.bm25:
+        scoring = BM25Scoring(index.article_count, index.avg_article_len, method)
+    else:
+        scoring = TFIDFScoring(index.article_count, index.avg_article_len, method)
     results = {}
 
     for topic in topics:
         print(f"searching for: {topic.query_string}")
-        result = engine.search(topic.query_string, scoring_method=scoring_method, ranking_method=ranking_method)
+        result = search(index, topic.query_string, scoring)
         temp_res = {}
         for key in islice(result, 100):
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'../{scoring_method}_{ranking_method}.txt')
+    compose_q_rel(results, f'../{scoring}.txt')
     print("done.")
-    # TODO: use trec_eval to evaluate
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-b', '--bm25', action='store_true', help='use BM25 scoring')
+    group.add_argument('-t', '--tf-idf', action='store_true', help='use TF-IDF scoring')
+    parser.add_argument('-c', '--cosine', action='store_true',
+                        help='use cosine similarity to compare documents to queries, '
+                             'normally the sum of all scores is used')
+    args = parser.parse_args()
+
     main()

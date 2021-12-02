@@ -7,7 +7,7 @@ from createindex import Posting
 
 
 class Scoring:
-    def __init__(self, total_num_articles: int, avg_doc_length: float, method: str = "cosine"):
+    def __init__(self, total_num_articles: int, avg_doc_length: float, method: str = "sum"):
         """
         Abstract class for scoring methods
         :param total_num_articles: total number of articles in database
@@ -89,6 +89,9 @@ class Scoring:
         ranked = self._rank(articles_with_tf_idf, query_vector)
         return ranked
 
+    def __str__(self):
+        return f'{self.__class__.__name__}_{self._method}'
+
 
 class TFIDFScoring(Scoring):
     def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
@@ -101,7 +104,7 @@ class BM25Scoring(Scoring):
     def __init__(self,
                  total_num_articles: int,
                  avg_doc_length: float,
-                 method="sum",
+                 method: str = "sum",
                  b: float = 0.75,
                  k: float = 1.25):
         """
@@ -114,15 +117,15 @@ class BM25Scoring(Scoring):
         :param k: controls term frequency scaling
         """
         super().__init__(total_num_articles, avg_doc_length, method)
-        self.b = b
-        self.k = k
+        self._b = b
+        self._k = k
 
     def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
         """
         Formula from: https://en.wikipedia.org/wiki/Okapi_BM25
         """
-        numerator = np.array(freq * (self.k + 1), dtype=float)
-        denominator = np.array(freq + self.k * (1 - self.b + self.b * doc_length), dtype=float)
+        numerator = np.array(freq * (self._k + 1), dtype=float)
+        denominator = np.array(freq + self._k * (1 - self._b + self._b * doc_length), dtype=float)
         tf = numerator / denominator
-        idf = np.log((self._total_num_articles - df + 0.5)/(df + 0.5) + 1)
+        idf = np.log((self._total_num_articles - df + 0.5) / (df + 0.5) + 1)
         return tf * idf
