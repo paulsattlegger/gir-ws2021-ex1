@@ -1,4 +1,4 @@
-map                     all     0.1297
-P_10                    all     0.3654
-recall_10               all     0.0797
-ndcg_cut_10             all     0.3951
+map                     all     0.2451
+P_10                    all     0.5404
+recall_10               all     0.1451
+ndcg_cut_10             all     0.5780
