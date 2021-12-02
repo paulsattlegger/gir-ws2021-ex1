@@ -2,6 +2,8 @@
 This file contains your code to create the inverted index. Besides implementing and using the predefined tokenization
 function (text2tokens), there are no restrictions in how you organize this file.
 """
+from __future__ import annotations
+
 import array
 import pickle
 import re
@@ -102,7 +104,7 @@ class InvertedIndex:
                     self.article_count += 1
                     document = futures[future]
                     # maybe len(article.bdy) instead of tokens count
-                    article_len = tokens.total()
+                    article_len = sum(tokens.values())
                     self._articles[article_title_id].append(int(document.stem))
                     self._articles[article_title_id].append(article_len)
                     self._total_article_len += article_len

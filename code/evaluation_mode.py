@@ -1,6 +1,8 @@
 """
 This file contains your code to generate the evaluation files that are input to the trec_eval algorithm.
 """
+from __future__ import annotations
+
 from argparse import ArgumentParser
 from collections import namedtuple
 from html.parser import HTMLParser
