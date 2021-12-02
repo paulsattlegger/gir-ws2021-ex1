@@ -26,18 +26,14 @@ APOSTROPHES_REGEX = r'[\u0060\u00B4\2018\u2019\u0027\u2032\u02BB]'  # Unicode ap
 # HYPHEN_REGEX = r'(?<=\d)[-–—―](?<=\d)'
 HYPHEN_REGEX = r'[\u002D\u058A\u05BE\u1400\u1806\u2010\u2011\u2012\u2013\u2014\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40' \
                r'\u2E5D\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D\u10EAD' \
-               r'\u005F\u203F\u2040\u2054\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]'  # Unicode 'Punctuation, Dash' and
-# TODO: remove
-# QUOTATION_REGEX = r'\u0022\u00AB\u00BB\u2018\u201A\u201C\u201D\u201E\u2039\u203A'  # Unicode quotations
+               r'\u005F\u203F\u2040\u2054\uFE33\uFE34\uFE4D\uFE4E\uFE4F\uFF3F]'  # Unicode 'Punctuation, Dash'
 
 # 'Punctuation, Connector'
+# (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
 PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
-# TODO: maybe ignore stopwords to improve performance
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
-# stemmer = PorterStemmer()
-stemmer_cache = {}
-stop_words = stopwords.words('english')  # TODO: make set
+stop_words = stopwords.words('english')
 
 Article = namedtuple("Article", ["title", "title_id", "bdy"])
 Posting = namedtuple("Posting", ["article_title_id", "article_len", "tf"])
@@ -197,7 +193,6 @@ def remove_hyphen(tokens):
 
 def remove_punctuation(tokens):
     # remove punctuation only from words not for numbers
-    # (?<!...) is called negative lookbehind assertion https://docs.python.org/3/library/re.html
     for token in tokens:
         token = re.sub(PUNCTUATION_REGEX, '', token)
         token = token.strip()
@@ -302,13 +297,9 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(text2tokens('mother\'s day'), ['mother', 'day'])
         self.assertEqual(text2tokens('Computer "Operating Systems"'), ['comput', 'oper', 'system'])
         self.assertEqual(text2tokens('"tai chi" styles forms'), ['tai', 'chi', 'style', 'form'])
-        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'),
-                         ['appl', 'inc', 'product', 'invent', 'steve', 'job'])
-        self.assertEqual(
-            text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'),
-            ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
-        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'),
-                         ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
+        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'), ['appl', 'inc', 'product', 'invent', 'steve',  'job'])
+        self.assertEqual(text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'), ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
+        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'), ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
 
 
 def main():
