@@ -1,6 +1,7 @@
 """
 This file contains your code to generate the evaluation files that are input to the trec_eval algorithm.
 """
+from argparse import ArgumentParser
 from collections import namedtuple
 from html.parser import HTMLParser
 from itertools import islice
@@ -60,12 +61,14 @@ def compose_q_rel(results: dict[str, dict[int, float]], path: str):
 
 
 def main():
-    # TODO: reindex as specified in the assignment
     index = InvertedIndex.load('../index.obj')
     topics = parse_topics_file('../dataset/topics.xml')
-    # Comment out what you *don't* want
-    scoring = BM25Scoring(index.article_count, index.avg_article_len, "sum")
-    scoring = TFIDFScoring(index.article_count, index.avg_article_len, "sum")
+
+    method = "cosine" if args.cosine else "sum"
+    if args.bm25:
+        scoring = BM25Scoring(index.article_count, index.avg_article_len, method)
+    else:
+        scoring = TFIDFScoring(index.article_count, index.avg_article_len, method)
     results = {}
 
     for topic in topics:
@@ -81,4 +84,13 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-b', '--bm25', action='store_true', help='use BM25 scoring')
+    group.add_argument('-t', '--tf-idf', action='store_true', help='use TF-IDF scoring')
+    parser.add_argument('-c', '--cosine', action='store_true',
+                        help='use cosine similarity to compare documents to queries, '
+                             'normally the sum of all scores is used')
+    args = parser.parse_args()
+
     main()
