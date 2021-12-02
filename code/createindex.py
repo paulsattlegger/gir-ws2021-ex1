@@ -207,7 +207,7 @@ def lowercase(tokens):
 
 def stem(tokens):
     """
-    This method uses the NLTK Porter stemmer
+    This method uses the NLTK Snowball stemmer
     :param tokens: A string ready for stemming
     :return: The stemmed string
     """
