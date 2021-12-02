@@ -11,7 +11,7 @@ from concurrent.futures import as_completed, ProcessPoolExecutor
 from datetime import timedelta
 from functools import cached_property, partial, lru_cache
 from html.parser import HTMLParser
-from itertools import zip_longest, islice
+from itertools import zip_longest
 from pathlib import Path
 from time import perf_counter
 from typing import Generator, Optional
@@ -33,7 +33,7 @@ PUNCTUATION_REGEX = r'(?<!\d)[^\w\s](?!\d)'
 
 # TODO: maybe ignore stopwords to improve performance
 stemmer = SnowballStemmer("english", ignore_stopwords=False)
-#stemmer = PorterStemmer()
+# stemmer = PorterStemmer()
 stemmer_cache = {}
 stop_words = stopwords.words('english')  # TODO: make set
 
@@ -88,8 +88,6 @@ class InvertedIndex:
     def populate(self, path: str, articles_total: int = 281782):
         self._path = Path(path)
         documents = self._path.iterdir()
-        # TODO: remove in final version
-        documents = islice(documents, 25)
         # __benchmark__ {
         start = perf_counter()
         # __benchmark__ }
@@ -209,6 +207,7 @@ def lowercase(tokens):
     for token in tokens:
         yield token.lower()
 
+
 def stem(tokens):
     """
     This method uses the NLTK Porter stemmer
@@ -217,6 +216,7 @@ def stem(tokens):
     """
     for token in tokens:
         yield lookup_stem(token)
+
 
 @lru_cache(maxsize=150000)
 def lookup_stem(token):
@@ -276,16 +276,19 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(list(remove_punctuation(input_text)), expected_text)
 
     def test_stemming(self):
-        input_text = ['davis', 'caresses', 'flies', 'flies', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed', 'owned',
+        input_text = ['davis', 'caresses', 'flies', 'flies', 'flies', 'dies', 'mules', 'denied', 'died', 'agreed',
+                      'owned',
                       'humbled', 'sized',
                       'meeting', 'stating', 'siezing', 'itemization', 'sensational', 'traditional', 'reference',
                       'colonizer', 'plotted']
-        expected_text = ['davi', 'caress', 'fli', 'fli', 'fli', 'die', 'mule', 'deni', 'die', 'agre', 'own', 'humbl', 'size',
+        expected_text = ['davi', 'caress', 'fli', 'fli', 'fli', 'die', 'mule', 'deni', 'die', 'agre', 'own', 'humbl',
+                         'size',
                          'meet', 'state', 'siez', 'item', 'sensat', 'tradit', 'refer', 'colon', 'plot']
         self.assertEqual(list(stem(input_text)), expected_text)
 
     def test_remove_stop_words(self):
-        input_text = ['this', 'is', 'a', 'i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope', "you're", "you've",
+        input_text = ['this', 'is', 'a', 'i', 'me', 'my', 'notremoved', 'myself', 'we', 'stays', 'our', 'you', 'nope',
+                      "you're", "you've",
                       'stillhere']
         expected_text = ['notremoved', 'stays', 'nope', 'stillhere']
         self.assertEqual(list(remove_stop_words(input_text)), expected_text)
@@ -297,12 +300,13 @@ class TestTextPreProcessing(unittest.TestCase):
         self.assertEqual(text2tokens('mother\'s day'), ['mother', 'day'])
         self.assertEqual(text2tokens('Computer "Operating Systems"'), ['comput', 'oper', 'system'])
         self.assertEqual(text2tokens('"tai chi" styles forms'), ['tai', 'chi', 'style', 'form'])
-        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'), ['appl', 'inc', 'product', 'invent', 'steve',  'job'])
-        self.assertEqual(text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'), ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
-        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'), ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
-
-
-
+        self.assertEqual(text2tokens('"Apple Inc" products invented by "Steve Jobs"'),
+                         ['appl', 'inc', 'product', 'invent', 'steve', 'job'])
+        self.assertEqual(
+            text2tokens('Jazz "Charles Mingus" "Miles Davis" collaboration interaction personal relationship -album'),
+            ['jazz', 'charl', 'mingus', 'mile', 'avi', 'collabor', 'interact', 'person', 'relationship', 'album'])
+        self.assertEqual(text2tokens('predictive analysis +logistic +regression model program application'),
+                         ['predict', 'analysi', 'logist', 'regress', 'model', 'program', 'applic'])
 
 
 def main():

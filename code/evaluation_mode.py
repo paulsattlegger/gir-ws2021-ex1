@@ -8,11 +8,8 @@ from pathlib import Path
 from typing import Optional
 
 from createindex import InvertedIndex
-from engine import Engine
-
-# TODO: aim scoring TF-IDF 0.20 %, BM25 0.22-0.23 %
-# TODO: parse topic file and get query id for relevant documents
-# TODO: use trec_eval
+from exploration_mode import search
+from scoring import BM25Scoring, TFIDFScoring
 
 Topic = namedtuple("Topic", ["query_id", "query_string"])
 
@@ -63,24 +60,24 @@ def compose_q_rel(results: dict[str, dict[int, float]], path: str):
 
 
 def main():
+    # TODO: reindex as specified in the assignment
+    index = InvertedIndex.load('../index.obj')
     topics = parse_topics_file('../dataset/topics.xml')
-    # TODO: change force_reindexing to True as specified in the assignment
-    engine = Engine(force_reindexing=False)
-    scoring_method = "bm25"  # 'tf-idf' or 'bm25'
-    ranking_method = "sum"
+    # Comment out what you *don't* want
+    scoring = BM25Scoring(index.article_count, index.avg_article_len, "sum")
+    scoring = TFIDFScoring(index.article_count, index.avg_article_len, "sum")
     results = {}
 
     for topic in topics:
         print(f"searching for: {topic.query_string}")
-        result = engine.search(topic.query_string, scoring_method=scoring_method, ranking_method=ranking_method)
+        result = search(index, topic.query_string, scoring)
         temp_res = {}
         for key in islice(result, 100):
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'../{scoring_method}_{ranking_method}.txt')
+    compose_q_rel(results, f'../{scoring.__class__.__name__}.txt')
     print("done.")
-    # TODO: use trec_eval to evaluate
 
 
 if __name__ == "__main__":
