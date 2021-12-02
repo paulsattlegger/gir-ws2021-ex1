@@ -89,6 +89,9 @@ class Scoring:
         ranked = self._rank(articles_with_tf_idf, query_vector)
         return ranked
 
+    def __str__(self):
+        return f'{self.__class__.__name__}_{self._method}'
+
 
 class TFIDFScoring(Scoring):
     def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):

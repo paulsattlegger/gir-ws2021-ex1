@@ -76,7 +76,7 @@ def main():
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'../{scoring.__class__.__name__}.txt')
+    compose_q_rel(results, f'../{scoring}.txt')
     print("done.")
 
 
