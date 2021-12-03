@@ -5,9 +5,11 @@ from __future__ import annotations
 
 from argparse import ArgumentParser
 from collections import namedtuple
+from datetime import timedelta
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
+from time import perf_counter
 from typing import Optional
 
 from createindex import InvertedIndex
@@ -73,13 +75,18 @@ def main():
         scoring = TFIDFScoring(index.article_count, index.avg_article_len, method)
     results = {}
 
+    n = 100
+    times = []
     for topic in topics:
         print(f"searching for: {topic.query_string}")
+        start = perf_counter()
         result = search(index, topic.query_string, scoring)
+        times.append(perf_counter() - start)
         temp_res = {}
-        for key in islice(result, 100):
+        for key in islice(result, n):
             temp_res[key] = result[key]
         results[topic.query_id] = temp_res
+    print(f'Average query time: {timedelta(seconds=sum(times) / n)}')
     print("Saving Q-Rel file...")
     compose_q_rel(results, f'../{scoring}.txt')
     print("done.")
