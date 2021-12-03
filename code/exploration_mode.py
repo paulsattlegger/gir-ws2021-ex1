@@ -42,7 +42,7 @@ def main():
         print("Commands ':q' = quit | :t' = tf-idf-scoring | ':b' = bm25-scoring")
         print(f"Current scoring method: {scoring}")
         print("What do you want to search?")
-        query = input('> ')
+        query = input('?> ')
 
         if query == ":q":
             break
@@ -53,14 +53,14 @@ def main():
         else:
             start = perf_counter()
             result = search(index, query, scoring)
-            print(f'{len(result)} results ({timedelta(seconds=perf_counter() - start).microseconds / 1000} ms)')
+            end = perf_counter()
             for i, (article_title_id, score) in enumerate(result.items()):
                 article = index.fetch(article_title_id)
-                print(f"Result #: {i + 1}")
-                print(f"Title: {article.title} | ID: {article.title_id} | Score: {score}")
                 print(f"{'-' * get_terminal_size().columns}")
                 print(f"{article.bdy}")
                 print(f"{'-' * get_terminal_size().columns}")
+                print(f'Result #: {i + 1} | Title: "{article.title}" | ID: {article.title_id} | Score: {score}')
+                print(f'{len(result)} results ({timedelta(seconds=end - start).microseconds / 1000} ms)')
                 print(f"Commands ':n' = next result | '<any>' = new search ")
                 query = input('> ')
                 if query != ":n":
