@@ -91,15 +91,15 @@ class Scoring:
         ranked = self._rank(articles_with_tf_idf, query_vector)
         return ranked
 
-    def __str__(self):
-        return f'{self.__class__.__name__}_{self._method}'
-
 
 class TFIDFScoring(Scoring):
     def _calc_score(self, freq: NDArray[int], df: int, doc_length: NDArray[float]):
         tf = np.log(freq + 1)
         idf = np.log(self._total_num_articles / df)
         return tf * idf
+
+    def __str__(self):
+        return f'tfidf_{self._method}'
 
 
 class BM25Scoring(Scoring):
@@ -131,3 +131,6 @@ class BM25Scoring(Scoring):
         tf = numerator / denominator
         idf = np.log((self._total_num_articles - df + 0.5) / (df + 0.5) + 1)
         return tf * idf
+
+    def __str__(self):
+        return f'bm25_{self._method}'

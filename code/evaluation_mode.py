@@ -56,12 +56,11 @@ def parse_topics_file(path: str):
     return parser.topics
 
 
-def compose_q_rel(results: dict[str, dict[int, float]], path: str):
-    run_name = "Test"
-    with Path(path).open("w") as file:
+def compose_q_rel(results: dict[str, dict[int, float]], scoring):
+    with Path(f'../retrieval_results/{scoring}_title_only.txt').open("w") as file:
         for topic_id, postings in results.items():
             for i, posting_id in enumerate(postings):
-                file.write(f"{topic_id} Q0 {posting_id} {i + 1} {postings[posting_id]} {run_name}\n")
+                file.write(f"{topic_id} Q0 {posting_id} {i + 1} {postings[posting_id]} {scoring}\n")
 
 
 def main():
@@ -88,7 +87,7 @@ def main():
         results[topic.query_id] = temp_res
     print(f'Average query time: {timedelta(seconds=sum(times) / n)}')
     print("Saving Q-Rel file...")
-    compose_q_rel(results, f'../{scoring}.txt')
+    compose_q_rel(results, scoring)
     print("done.")
 
 
