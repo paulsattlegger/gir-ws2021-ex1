@@ -26,7 +26,7 @@ class Scoring:
     def _calc_query_vector(self, query: dict[str, int], query_dict: dict, dfs: list[int]):
         dfs_np = np.array(dfs)
         query_vector = np.zeros(len(query_dict), dtype=float)
-        idfs = np.divide(self._total_num_articles, dfs_np, out=np.zeros_like(dfs_np), where=dfs_np != 0)
+        idfs = np.divide(self._total_num_articles, dfs_np, out=np.zeros(dfs_np.shape, dtype=float), where=dfs_np != 0)
         idfs = np.log(idfs)
         for i, word in enumerate(query):
             query_vector[i] = np.log(1 + query[word]) * idfs[i]
